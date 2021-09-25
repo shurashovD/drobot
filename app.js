@@ -39,6 +39,8 @@ app.use('/api/competitions', require('./routes/competition.routes'))
 
 //app.use('/results', require('./routes/result.routes'))
 
+app.use('/.well-known', express.static(path.join(__dirname, 'static')))
+
 app.use('/admin/', express.static(path.join(__dirname, 'admin', 'build')))
 
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')))
