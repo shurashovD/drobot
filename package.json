@@ -5,10 +5,10 @@
   "main": "app.js",
   "scripts": {
     "admin": "npm run start --prefix admin",
-    "admin:intstall": "npm install --prefix admin",
+    "admin:install": "npm install --prefix admin",
     "admin:build": "npm run build --prefix admin",
-    "admin-dev": "cross-env LEVEL=develop concurrently \"npm run server\" \"npm run admin\"",
-    "start": "cross-env LEVEL=production node app",
+    "admin-dev": "cross-env concurrently \"npm run server\" \"npm run admin\"",
+    "start": "cross-env NODE_ENV=production node app",
     "server": "nodemon app.js"
   },
   "keywords": [
