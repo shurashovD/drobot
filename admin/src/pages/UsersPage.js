@@ -46,7 +46,7 @@ export const UsersPage = () => {
             <Navbar links={links} />
             <div className="container">
                 { users.length === 0 && <p className="text-center fs-3 m-5">Пользователи не найдены</p> }
-                <table className="table">
+                { users.length > 0 && <table className="table">
                     <thead>
                         <tr>
                             <th className="text-center">#</th>
@@ -61,7 +61,7 @@ export const UsersPage = () => {
                         users.map(({_id, avatar, name, login}) => (
                             <tr key={_id} className="align-middle">
                                 <td className="text-center">
-                                    <img src={avatar} alt="avatar" width="64" />
+                                    { avatar && avatar.length > 0 && <img src={avatar} alt="avatar" width="64" /> }
                                 </td>
                                 <td>{name}</td>
                                 <td>{login}</td>
@@ -69,7 +69,7 @@ export const UsersPage = () => {
                                     <NavLink to={`/admin/users/add/${_id}`} className="btn btn-sm btn-primary">Изменить</NavLink>
                                 </td>
                                 <td className="text-center">
-                                    <button className="btn btn-sm btn-danger" data-category-id={_id}
+                                    <button className="btn btn-sm btn-danger" data-user-id={_id}
                                         onClick={rmUserHandler}
                                     >
                                         Удалить
@@ -79,7 +79,7 @@ export const UsersPage = () => {
                         ))
                     }
                     </tbody>
-                    </table>
+                    </table> }
             </div>
         </div>
     )

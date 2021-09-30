@@ -5,7 +5,7 @@ export const Navbar = props => {
     const links = props.links ?? []
 
     return (
-        <ul className="nav">
+        <ul className="nav border-bottom">
             <li className="nav-item">
                 <NavLink to="/admin" className="nav-link" activeClassName="nav-link active">
                     Главная

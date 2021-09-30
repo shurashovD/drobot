@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { useParams } from "react-router-dom"
 import { Loader } from "../components/Loader"
 import { Navbar } from "../components/Navbar"
@@ -8,7 +8,6 @@ import { useHttp } from "../hooks/http.hook"
 export const AddCategoryPage = () => {
     const [category, setCategory] = useState({name: '', tasks: []})
     const [showAdd, setShowAdd] = useState(false)
-    const [update, setUpdate] = useState(false)
     const [form, setForm] = useState({ name: '', description: '' })
     const { request, loading, error, clearError } = useHttp()
     const { errorAlert, successAlert } = useAlert()
@@ -60,7 +59,7 @@ export const AddCategoryPage = () => {
         if ( params.id ) {
             getCategoryById(params.id)
         }
-    }, [params])
+    }, [params, getCategoryById])
 
     useEffect(() => {
         if ( error ) {

@@ -1,0 +1,61 @@
+$font-family-base: "Exo 2";
+
+$font-size-base: 1rem;
+$h4-font-size: $font-size-base * 24 / 16;
+
+$border-radius: 0;
+
+$primary: #045404;
+$secondary: #187418;
+$dark: #001C00;
+$light: #EACF78;
+
+$input-padding-y: 11px;
+$input-color: $primary;
+$input-border-color: $primary;
+$input-placeholder-color: $secondary;
+
+@import "~bootstrap/scss/bootstrap";
+
+body {
+  font-family: "Exo 2";
+}
+
+.btn {
+    padding: 15px;
+    text-transform: uppercase;
+    color: $light;
+    min-width: 167px;
+}
+.btn:focus {
+    outline: none;
+}
+
+.btn-primary:hover {
+    color: $light;
+    background-color: $secondary;
+}
+.btn-primary:active {
+    color: $light;
+    background-color: $secondary;
+    border: 1px $secondary;
+    outline: none;
+}
+.btn-primary:focus {
+    color: $light;
+    background-color: $secondary;
+    border: 1px $secondary;
+    outline: none;
+}
+
+input:focus {
+    outline: none;
+}
+
+p, span, a, h4 {
+    color: $primary;
+}
+
+h4 {
+    text-transform: uppercase;
+}

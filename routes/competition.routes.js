@@ -2,8 +2,8 @@ const router = require('express').Router()
 const parser = require('body-parser')
 
 const CompetitionModel = require('../models/CompetitionModel')
-
 const UserModel = require('../models/UserModel')
+const CategoryModel = require('../models/CategoryModel')
 
 const COMPETITION_STATUSES = require('../types/competitionStatuses')
 const COMPETITION_ROLES = require('../types/refereeRoles')
@@ -19,7 +19,7 @@ router.get('/get-currrent-info', (req, res) => {
     }
 })*/
 
-router.get('/get-all-competitions', async (req, res) => {
+router.get('/get-all', async (req, res) => {
     try {
         const result = await CompetitionModel.find()
         res.json(result)
@@ -29,80 +29,66 @@ router.get('/get-all-competitions', async (req, res) => {
         res.status(500).json({ message: 'Что-то пошло не так...' })
     }
 })
-/*
-router.use('/get-competition-by-id', parser.json(), async (req, res) => {
+
+router.post('/get-competition-by-id', parser.json(), async (req, res) => {
     try {
-        const competition = await CompetitionModel.findById(req.body.id)
-        const users = await UserModel.find()
+        const competition = await CompetitionModel.findById(req.body.id).exec()
+        if ( !competition ) {
+            return res.status(500).json({ message: 'Ошибка получения мероприятия' })
+        }
+        const users = await UserModel.find().exec()
+        const categories = await CategoryModel.find().exec()
         
-        const refereeSetting = competition.refereeSetting.map(({category, referees}) => ({
-            category,
-            referees: referees.map(({refereeId, role, hide}) => {
-                const { _id, name, login, avatar } = users.find(({_id}) => _id.toString() === refereeId.toString())
-                return {
-                    _id, name, login, role, hide,
-                    avatar: avatar ?? '/api/users/get-avatar/undef.jpeg'
-                }
+        const result = {
+            ...competition.toObject(),
+            categories: competition.categories.map(item => {
+                const category = categories.find(({_id}) => _id.toString() === item.category.toString()) ?? {}
+                const referees = item.referees.map(refereeItem => {
+                    const referee = users.find(({_id}) => _id.toString() === refereeItem.referee.toString()) ?? {}
+                    return {...referee.toObject(), role: refereeItem.role}
+                })
+                return { category, referees }
+            }),
+            screens: competition.screens.map(item => {
+                const screen = users.find(({_id}) => _id.toString() === item.screen.toString())
+                const categs = item.categories.map(id => categories.find(({_id}) => _id.toString() === id.toString()))
+                return { screen, categories: categs, role: item.role }
             })
-        }))
-
-        const screens = competition.screens?.map(item => {
-            const {name, login, avatar} = users.find(({_id}) => _id.toString() === item.screenId.toString()) ?? {}
-            return {...item._doc, name, login, avatar: avatar ?? '/api/users/get-avatar/undef.jpeg'}
-        }) ?? []
-
-        result = {
-            _id: competition._id,
-            competitionName: competition.competitionName,
-            competitionPlace: competition.competitionPlace,
-            competitionDate: competition.competitionDate,
-            status: competition.status,
-            refereeSetting, screens
         }
 
         res.json(result)
     }
     catch (e) {
-        log.error(e)
-        res.status(500).json({ message: 'SERVER ERROR' })
+        console.log(e);
+        res.status(500).json({ message: 'Что-то пошло не так...' })
     }
 })
 
-router.use('/create-competition', parser.json(), async (req, res) => {
+router.post('/add-competition', parser.json(), async (req, res) => {
     try {
-        const status = COMPETITION_STATUSES.created
-        const { competitionName, competitionPlace, competitionDate } = req.body
-        const refereeSetting = [
-            {
-                category: 'arrow',
-                referees: []
-            },
-            {
-                category: 'lips',
-                referees: []
-            },
-            {
-                category: 'feathering',
-                referees: []
-            },
-            {
-                category: 'hairTechnology',
-                referees: []
-            },
-            {
-                category: 'Microblading',
-                referees: []
-            }
-        ]
-        await CompetitionModel({ competitionName, competitionPlace, competitionDate, status, refereeSetting, screen: [] }).save()
+        const { competition } = req.body
+        await CompetitionModel(competition).save()
         res.status(201).json({ message: 'Мероприятие создано' })
     }
     catch (e) {
-        log.error('/api/competitions/create-competition', e)
-        res.status(500).json({ message: 'SERVER ERROR' })
+        console.log(e)
+        res.status(500).json({ message: 'Что-то пошло не так...' })
     }
 })
 
+router.post('/update-competition', parser.json(), async (req, res) => {
+    try {
+        const { competition, id } = req.body
+        await CompetitionModel.findByIdAndUpdate(id, competition)
+        res.status(201).json({ message: 'Мероприятие обновлено' })
+    }
+    catch (e) {
+        console.log(e)
+        res.status(500).json({ message: 'Что-то пошло не так...' })
+    }
+})
+
+/*
 router.use('/add-user-to-settings', parser.json(), async (req, res) => {
     try {
         const { category, userId, competitionId } = req.body
@@ -303,16 +289,16 @@ router.use('/settings-set-state', parser.json(), async (req, res) => {
         res.status(500).json({ message: 'SERVER ERROR' })
     }
 })
-
-router.use('/remove-competition', parser.json(), async (req, res) => {
-  try {
-    await CompetitionModel.deleteOne({_id: req.body.id})
-    res.json({})
-  }
-  catch (e) {
-    log.error(e)
-    res.status(500).json({ message: 'Ошибка удаления мероприятия' })
-  }
-})
 */
+router.post('/remove-competition', parser.json(), async (req, res) => {
+    try {
+        await CompetitionModel.deleteOne({_id: req.body.id})
+        return res.json({ message: 'Мероприятие удалено' })
+    }
+    catch (e) {
+        console.log(e)
+        res.status(500).json({ message: 'Ошибка удаления мероприятия' })
+    }
+})
+
 module.exports = router

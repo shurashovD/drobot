@@ -17,13 +17,14 @@ router.use('/login', parser.json(), async (req, res) => {
             }
             const competition = await CompetitionModel.findOne({ status: COMP_STATUS.started })
             if ( competition ) {
-                const role = competition.refereeSetting.find(({referees}) => referees.some(({refereeId}) => user._id.toString() === refereeId.toString()))
-                    ?.referees.find(({refereeId}) => user._id.toString() === refereeId.toString()).role
+                const role = competition.categories
+                    .reduce((arr, {referees}) => arr.concat(referees), [])
+                    .find(({referee}) => referee.toString() === user._id.toString())?.role
                 if ( role ) {
                     return res.json({...user._doc, role})
                 }
 
-                const screen = competition.screens.find(({screenId}) => screenId.toString() === user._id.toString())
+                const screen = competition.screens.find(({screen}) => screen.toString() === user._id.toString())
                 if ( screen ) {
                     return res.json({...user._doc, role: screen.role})
                 }

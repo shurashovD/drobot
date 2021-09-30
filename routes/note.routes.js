@@ -1,17 +1,16 @@
 const router = require('express').Router()
+const mongoose = require('mongoose')
 const parser = require('body-parser')
 const multer = require('multer')
 const fs = require('fs')
+const { copyFile, rm } = require('fs/promises')
 const path = require('path')
 const config = require('config')
-
-const transporter = require('nodemailer').createTransport(config.transport)
-
-const log = require('../handlers/logger')
 
 const MasterModel = require('../models/MasterModel')
 const NoteModel = require('../models/NoteModel')
 const CompetitionModel = require('../models/CompetitionModel')
+const CategoryModel = require('../models/CategoryModel')
 const TestModel = require('../models/TestModel')
 const UserModel = require('../models/UserModel')
 
@@ -20,25 +19,25 @@ const ROLE = require('../types/refereeRoles')
 
 const photoStorage = multer.diskStorage({
     destination: (req, file, cb) => {
-        cb(null, path.join(__dirname, '..', 'uploads', 'photos'))
+        cb(null, path.join(__dirname, '..', 'tmp'))
     },
     filename: (req, file, cb) => {
-        cb(null, Date.now() + Math.random(100) + path.extname(file.originalname))
+        cb(null, file.originalname)
     }
 })
 const upload = multer({ storage: photoStorage })
-const photosUpload = upload.fields([{name: 'beforePhoto'}, {name: 'afterPhoto'}])
+const photosUpload = upload.array('photo', 10)
 
 const commentStorage = multer.diskStorage({
     destination: (req, file, cb) => {
-        cb(null, path.join(__dirname, '..', 'uploads', 'comments'))
+        cb(null, path.join(__dirname, '..', 'tmp'))
     },
     filename: (req, file, cb) => {
-        cb(null, Date.now() + Math.random(100) + path.extname(file.originalname))
+        cb(null, file.originalname)
     }
 })
 const commentUpload = multer({ storage: commentStorage })
-const commentUploadHandler = commentUpload.array('comment')
+const commentUploadHandler = commentUpload.array('comment', 20)
 
 const rmFile = filePath => {
     return new Promise((resolve, reject) => {
@@ -69,37 +68,31 @@ const renameFile = (filePath, newPath) => {
     })
 }
 
-router.use('/add-note', parser.json(), async (req, res) => {
-    const acceptLanguage = (req.headers['accept-language'])
+router.post('/add-note', parser.json(), async (req, res) => {
     try {
-        const { name, mail, category, rfid } = req.body
+        const { name, mail, category, rfid } = req.body.data
         let { masterId } = req.body
 
         const competition = await CompetitionModel.findOne({ status: COMP_ST.started })
 
         // нет запущенного мероприятия;
         if ( !competition ) {
-            log.error('Попытка регистрации участника без запущенного мероприятия')
-            const enMessage = global.dictionary.find(({lang, key}) => (lang === 'EN' && key === 'nonStartedCompetition')).phrase
-            const message = global.dictionary.find(({lang, key}) => (lang === acceptLanguage && key === 'nonStartedCompetition'))?.phrase ?? enMessage
-            return res.status(500).json({ message })
+            return res.status(500).json({ message: 'Нет запущенного мероприятия' })
         }
 
         const notes = await NoteModel.find({ competitionId: competition._id })
-        const lastNumberInCurrentCompetition = notes.sort((a, b) => b.number - a.number)[0]?.number ?? 0
+        const lastNumberInCurrentCompetition = notes
+            .filter(note => note.category.toString() === category.toString())
+            .sort((a, b) => b.number - a.number)[0]?.number ?? 0
 
         // метка занята;
         if ( notes.some(item => (item.rfid === rfid && item.completed === false)) ) {
-            const enMessage = global.dictionary.find(({lang, key}) => (lang === 'EN' && key === 'rfidBisy')).phrase
-            const message = global.dictionary.find(({lang, key}) => (lang === acceptLanguage && key === 'rfidBisy'))?.phrase ?? enMessage
-            return res.status(500).json({ message })
+            return res.status(500).json({ message: 'Метка занята' })
         }
         
         // мастер уже зарегистророван в текущей категории;
-        if (notes.some(item => (item.master?.toString() === masterId?.toString() && item.category === category))) {
-            const enMessage = global.dictionary.find(({lang, key}) => (lang === 'EN' && key === 'partExistInCurrentCategory')).phrase
-            const message = global.dictionary.find(({lang, key}) => (lang === acceptLanguage && key === 'partExistInCurrentCategory'))?.phrase ?? enMessage
-            return res.status(500).json({ message })
+        if (notes.some(item => (item.master?.toString() === masterId?.toString() && item.category.toString() === category.toString()))) {
+            return res.status(500).json({ message: 'Мастер уже зарегистрирован в текущей категории' })
         }
 
         // создание мастера, если нет доступного masterId;
@@ -108,15 +101,9 @@ router.use('/add-note', parser.json(), async (req, res) => {
             if ( !master ) {
                 const candidate = await MasterModel.findOne({ name })
                 if ( candidate ) {
-                    const enMessage = global.dictionary.find(({lang, key}) => (lang === 'EN' && key === 'registerMasterNameBisy')).phrase
-                    const message = global.dictionary.find(({lang, key}) => (lang === acceptLanguage && key === 'registerMasterNameBisy'))?.phrase ?? enMessage
-                    return res.status(500).json({ message })
+                    return res.status(500).json({ message: 'Мастер с таким именем уже есть. Выберите его из выпадающего списка при регистрации' })
                 }
-
-                master = await MasterModel({
-                    name, mail,
-                    avatar: '/api/users/get-avatar/undef.jpeg',
-                }).save()
+                master = await MasterModel({name, mail}).save()
                 masterId = master._id
             }
         }
@@ -127,33 +114,34 @@ router.use('/add-note', parser.json(), async (req, res) => {
             number: lastNumberInCurrentCompetition + 1,
             category, rfid
         }).save()
-        return res.json({ message: lastNumberInCurrentCompetition + 1 })
+        return res.json({ message: 'Участник зарегистрирован с номером ' + (lastNumberInCurrentCompetition + 1) })
     }
     catch (e) {
-        log.error(e)
-        const enMessage = global.dictionary.find(({lang, key}) => (lang === 'EN' && key === 'serverError')).phrase
-        const message = global.dictionary.find(({lang, key}) => (lang === acceptLanguage && key === 'serverError'))?.phrase ?? enMessage
-        return res.status(500).json({ message })
+        console.log(e)
+        return res.status(500).json({ message: 'Что-то пошло не так...' })
     }
 })
 
-router.use('/get-note-by-rfid', parser.json(), async (req, res) => {
-    const acceptLanguage = (req.headers['accept-language'])
+router.post('/get-note-by-rfid', parser.json(), async (req, res) => {
     try {
         const { rfid } = req.body
-        const note = await NoteModel.findOne({ rfid, completed: false })
-        if ( !note ) {
-            const enMessage = global.dictionary.find(({lang, key}) => (lang === 'EN' && key === 'errorReceivingPart')).phrase
-            const message = global.dictionary.find(({lang, key}) => (lang === acceptLanguage && key === 'errorReceivingPart'))?.phrase ?? enMessage
-            return res.status(500).json({ message })
+        const notes = await NoteModel.aggregate([
+            { $match: { rfid } },
+            { $lookup: { from: 'categories', localField: 'category', foreignField: '_id', as: 'fromCategories' } },
+            { $lookup: { from: 'masters', localField: 'master', foreignField: '_id', as: 'fromMasters' } },
+            { $replaceRoot: { newRoot: { $mergeObjects: [ "$$ROOT", {
+                category: { $arrayElemAt: [ "$fromCategories", 0 ] },
+                master: { $arrayElemAt: [ "$fromMasters", 0 ] }
+            } ] } } }
+        ])
+        if ( notes[0] ) {
+            return res.json(notes[0])
         }
-        return res.json(note)
+        return res.status(500).json({ message: 'Участник не найден...' })
     }
     catch (e) {
-        log.error(e)
-        const enMessage = global.dictionary.find(({lang, key}) => (lang === 'EN' && key === 'serverError')).phrase
-        const message = global.dictionary.find(({lang, key}) => (lang === acceptLanguage && key === 'serverError'))?.phrase ?? enMessage
-        return res.status(500).json({ message })
+        console.log(e)
+        return res.status(500).json({ message: 'Что-то пошло не так...' })
     }
 })
 
@@ -178,285 +166,467 @@ router.use('/get-note-for-referee', parser.json(), async (req, res) => {
     }
 })
 
-router.use('/get-note-by-number', parser.json(), async (req, res) => {
-    const acceptLanguage = (req.headers['accept-language'])
+router.post('/get-note-by-number', parser.json(), async (req, res) => {
     try {
-        const { number } = req.body
+        const { number, category } = req.body
 
         const competition = await CompetitionModel.findOne({ status: COMP_ST.started })
         if ( !competition ) {
-            log.error('Попытка получения участника без запущенного мероприятия')
-            const enMessage = global.dictionary.find(({lang, key}) => (lang === 'EN' && key === 'nonStartedCompetition')).phrase
-            const message = global.dictionary.find(({lang, key}) => (lang === acceptLanguage && key === 'nonStartedCompetition'))?.phrase ?? enMessage
-            return res.status(500).json({ message })
+            return res.status(500).json({ message: 'Нет запущенного мероприятия' })
         }
-
-        const note = await NoteModel.findOne({ number, competitionId: competition._id })
-        res.json(note)
+        
+        const notes = await NoteModel.aggregate([
+            {
+                $match: { number: parseInt(number), competitionId: competition._id, category }
+            },
+            {
+                $lookup: {
+                    from: 'masters',
+                    localField: 'master',
+                    foreignField: '_id',
+                    as: 'master'
+                }
+            }
+        ])
+    
+        if ( notes[0] ) {
+            return res.json(notes[0])
+        }
+        return res.status(500).json({ message: 'Участник не найден...' })
     }
     catch (e) {
-        log.error(e)
-        const enMessage = global.dictionary.find(({lang, key}) => (lang === 'EN' && key === 'serverError')).phrase
-        const message = global.dictionary.find(({lang, key}) => (lang === acceptLanguage && key === 'serverError'))?.phrase ?? enMessage
-        return res.status(500).json({ message })
+        console.log(e);
+        return res.status(500).json({ message: 'Что-то пошло не так...' })
     }
 })
 
-router.use('/upload-photo', photosUpload, async (req, res) => {
-    const { noteId } = req.body
-    const acceptLanguage = (req.headers['accept-language'])
-
+router.post('/upload-photos', photosUpload, async (req, res) => {
     try {
+        const data = JSON.parse(req.body.note)
+        const noteId = data._id
+        const photos = data.photos
+
         const note = await NoteModel.findById(noteId)
 
-        if ( req.files && note ) {
-            const beforePhoto = req.files['beforePhoto']?.[0]
-            const afterPhoto = req.files['afterPhoto']?.[0]
-
-            if ( beforePhoto ) {
-                const beforePhotoNewName = noteId + '_before' + path.extname(beforePhoto.filename)
-                await renameFile(
-                    path.join(__dirname, '..', 'uploads', 'photos', path.basename(beforePhoto.filename)),
-                    path.join(__dirname, '..', 'uploads', 'photos', beforePhotoNewName)
-                )
-                note.beforePhoto = '/api/notes/get-photo/' + beforePhotoNewName
+        if ( req.files?.length > 0 && !note ) {
+            for ( let i in req.files ) {
+                const file = req.files[i]
+                await rm(path.join(__dirname, '..', 'tmp', file.originalname))
             }
-
-            if ( afterPhoto ) {
-                const afterPhotoNewName = noteId + '_after' + path.extname(afterPhoto.filename)
-                await renameFile(
-                    path.join(__dirname, '..', 'uploads', 'photos', path.basename(afterPhoto.filename)),
-                    path.join(__dirname, '..', 'uploads', 'photos', afterPhotoNewName)
-                )
-                note.afterPhoto = '/api/notes/get-photo/' + afterPhotoNewName
-            }
-            await note.save()
-            const enMessage = global.dictionary.find(({lang, key}) => (lang === 'EN' && key === 'uploadPhotoComplete')).phrase
-            const message = global.dictionary.find(({lang, key}) => (lang === acceptLanguage && key === 'uploadPhotoComplete'))?.phrase ?? enMessage
-            return res.json({ message })
+            res.status(500).json({ message: 'Ошибка! Фотографии не сохранены...' })
         }
 
-        if ( req.files && !note ) {
-            const beforePhoto = req.files['beforePhoto'][0]
-            const afterPhoto = req.files['afterPhoto'][0]
-            if ( beforePhoto ) {
-                const filePath = path.join(__dirname, '..', 'uploads', 'photos', path.basename(beforePhoto.filename))
-                await rmFile(filePath)
+        const delList = []
+        for ( let i in note.photos ) {
+            const photoSrc = note.photos[i]
+            if ( !photos.some(item => item === photoSrc) ) {
+                try {
+                    await rm(path.join(__dirname, '..', 'static', 'uploads', noteId.toString(), path.basename(photoSrc)))
+                }
+                catch {}
+                delList.push(photoSrc)
             }
-            if ( afterPhoto ) {
-                const filePath = path.join(__dirname, '..', 'uploads', 'photos', path.basename(afterPhoto.filename))
-                await rmFile(filePath)
-            }
-            throw new Error(`Фотографии получены. Не найдена запись по id: ${noteId}`)
         }
-    }
-    catch (e) {
-        log.error(e)
-        const enMessage = global.dictionary.find(({lang, key}) => (lang === 'EN' && key === 'serverError')).phrase
-        const message = global.dictionary.find(({lang, key}) => (lang === acceptLanguage && key === 'serverError'))?.phrase ?? enMessage
-        return res.status(500).json({ message })
-    }
-})
+        note.photos = note.photos.filter(item => !delList.some(el => el === item))
 
-router.use('/get-photo', (req, res) => {
-    try {
-        const filePath = path.join(__dirname, '..', 'uploads', 'photos', path.basename(req.path))
-        fs.access(filePath, fs.constants.F_OK, err => {
-            if (err) {
-                throw new Error(`Ошибка отдачи фотографии ${req.path}`)
-            }
-            res.set('Cache-control', 'private, max-age=0, no-cache, must-revalidate').sendFile(filePath)
-        })
-    }
-    catch (e) {
-        log.error(e)
-        res.status(500).json({ message: 'SERVER ERROR' })
-    }
-})
-
-router.use('/get-comment', (req, res) => {
-    try {
-        const filePath = path.join(__dirname, '..', 'uploads', 'comments', path.basename(req.path))
-        fs.access(filePath, fs.constants.F_OK, err => {
-            if (err) {
-                throw new Error(`Ошибка отдачи комментария ${req.path}`)
-            }
-            res.set('Cache-control', 'private, max-age=0, no-cache, must-revalidate').sendFile(filePath)
-        })
-    }
-    catch (e) {
-        log.error(e)
-        res.status(500).json({ message: 'SERVER ERROR' })
-    }
-})
-
-router.use('/set-hyhienical-score', commentUploadHandler, async (req, res) => {
-    const acceptLanguage = (req.headers['accept-language'])
-    const { noteId, value } = req.body
-
-    try {
-        const note = await NoteModel.findById(noteId)
-        if ( !note ) {
-            throw new Error(`Ошибка получения записи при сохранении данных гигиениста. NoteId=${noteId}`)
-        }
-
-        if ( req.files ) {
-            const comment = req.files?.[0]
-
-            if ( comment ) {
-                const commentNewName = noteId + '_hyhienical.webm'
-                await renameFile(
-                    path.join(__dirname, '..', 'uploads', 'comments', path.basename(comment.filename)),
-                    path.join(__dirname, '..', 'uploads', 'comments', commentNewName)
-                )
-                note.hyhienicalScore.comment = '/api/notes/get-comment/' + commentNewName
-            }
-
-            note.hyhienicalScore.value = value ?? 0
-            await note.save()
-            const enMessage = global.dictionary.find(({lang, key}) => (lang === 'EN' && key === 'pointsAreCounted')).phrase
-            const message = global.dictionary.find(({lang, key}) => (lang === acceptLanguage && key === 'pointsAreCounted'))?.phrase ?? enMessage
-            return res.json({ message })
-        }
-    }
-    catch (e) {
-        log.error(e)
-        const enMessage = global.dictionary.find(({lang, key}) => (lang === 'EN' && key === 'serverError')).phrase
-        const message = global.dictionary.find(({lang, key}) => (lang === acceptLanguage && key === 'serverError'))?.phrase ?? enMessage
-        return res.status(500).json({ message })
-    }
-})
-
-router.use('/set-referee-scores', commentUploadHandler, async (req, res) => {
-    const acceptLanguage = (req.headers['accept-language'])
-    const { noteId, tasks } = req.body
-    const refereeId = req.headers.authorization?.split(' ')[1]
-
-    try {
-        const note = await NoteModel.findById(noteId)
-        if ( !note ) {
-            throw new Error(`Ошибка получения записи при сохранении данных гигиениста. NoteId=${noteId}`)
-        }
-
-        const competition = await CompetitionModel.findOne({ status: COMP_ST.started })
-
-        // нет запущенного мероприятия;
-        if ( !competition ) {
-            log.error('Попытка регистрации участника без запущенного мероприятия')
-            const enMessage = global.dictionary.find(({lang, key}) => (lang === 'EN' && key === 'nonStartedCompetition')).phrase
-            const message = global.dictionary.find(({lang, key}) => (lang === acceptLanguage && key === 'nonStartedCompetition'))?.phrase ?? enMessage
-            return res.status(500).json({ message })
-        }
-
-        if (!competition.refereeSetting.find(({category}) => category === note.category)?.referees.some(item => item.refereeId.toString() === refereeId.toString())) {
-            log.error(`Попытка отсудить участника без допуска. Судья: ${refereeId}. Мероприятие: ${competition._id}`)
-            const enMessage = global.dictionary.find(({lang, key}) => (lang === 'EN' && key === 'refereeNotAccess')).phrase
-            const message = global.dictionary.find(({lang, key}) => (lang === acceptLanguage && key === 'refereeNotAccess'))?.phrase ?? enMessage
-            return res.status(500).json({ message })
-        }
-
-        const tasksArr = JSON.parse(tasks)
-        for ( let i in tasksArr ) {
-            const { _id, value} = tasksArr[i]
-            const newScore = note.scores.find(score => score.refereeId.toString() === refereeId.toString()) ?? { refereeId, refereeScores: [] }
-            const newRefereeScore = newScore.refereeScores.find(({testId}) => testId.toString() === _id.toString()) ?? { testId: _id, value }
-            newRefereeScore.value = value
-
-            const file = req.files?.find(({originalname}) => originalname === `${_id}.webm`)
-            if ( file ) {
-                await renameFile(file.path, path.join(__dirname, '..', 'uploads', 'comments', `${noteId}_${refereeId}_${file.originalname}`))
-                newRefereeScore.comment = `/api/notes/get-comment/${noteId}_${refereeId}_${file.originalname}`
-            }
-
-            newScore.refereeScores = newScore.refereeScores.filter(({testId}) => testId.toString() !== _id.toString()).concat(newRefereeScore)
-            note.scores = note.scores.filter(score => score.refereeId.toString() !== refereeId.toString()).concat(newScore)
-        }
-
-        const referees = competition.refereeSetting.find(({category}) => category === note.category).referees ?? []
-        const roleFilterReferees = referees.filter(({role}) => role === ROLE.referee)
-        note.completed = roleFilterReferees.every(referee => note.scores.some(score => score.refereeId.toString() === referee.refereeId.toString()))
-
-        await note.save()
-        const enMessage = global.dictionary.find(({lang, key}) => (lang === 'EN' && key === 'pointsAreCounted')).phrase
-        const message = global.dictionary.find(({lang, key}) => (lang === acceptLanguage && key === 'pointsAreCounted'))?.phrase ?? enMessage
-        res.json({ message })
-
-        if ( note.completed ) {
-            const attachments = []
-            scores.forEach(score => {
-                const { refereeScores } = score
-                refereeScores.forEach(item => {
-                    if ( Boolean(item.comment) )
-                    attachments.push({ path: item.comment })
+        if ( req.files?.length > 0 ) {
+            try {
+                await new Promise((resolve, reject) => {
+                    fs.access(path.join(__dirname, '..', 'static', 'uploads', noteId.toString()), fs.constants.F_OK, err => {
+                        if ( err ) {
+                            fs.mkdir(path.join(__dirname, '..', 'static', 'uploads', noteId.toString()), err => {
+                                if ( err ) {
+                                    reject()
+                                }
+                                else {
+                                    resolve()
+                                }
+                            })
+                        }
+                        else {
+                            resolve()
+                        }
+                    })
                 })
-            })
+            }
+            catch {
+                return res.status(500).json({ message: 'Ошибка создания каталога участника' })
+            }
 
-            if ( Boolean(note.beforePhoto) ) attachments.push({ path: note.beforePhoto })
-            if ( Boolean(note.afterPhoto) ) attachments.push({ path: note.afterPhoto })
-            if ( Boolean(note.hyhienicalScore.comment) ) attachments.push({ path: note.hyhienicalScore.comment })
-
-            const master = MasterModel.findById(note.master.toString())
-
-            await transporter.sendMail({...config.mailData, attachments, text: master?.mail })
+            const photos = []
+            for ( let i in req.files ) {
+                const file = req.files[i]
+                try {
+                    await copyFile(
+                        path.join(__dirname, '..', 'tmp', file.originalname),
+                        path.join(__dirname, '..', 'static', 'uploads', noteId.toString(), file.originalname)
+                    )
+                    await rm(path.join(__dirname, '..', 'tmp', file.originalname))
+                    photos.push(`/static/uploads/${noteId.toString()}/${file.originalname}`)
+                }
+                catch (e) {
+                    console.log(e)
+                    await rm(path.join(__dirname, '..', 'tmp', file.originalname))
+                }
+            }
+            note.photos = note.photos.concat(photos)
         }
+        await note.save()
+        return res.json({ message: 'Фотографии сохранены' })
     }
     catch (e) {
-        log.error(e)
-        const enMessage = global.dictionary.find(({lang, key}) => (lang === 'EN' && key === 'serverError')).phrase
-        const message = global.dictionary.find(({lang, key}) => (lang === acceptLanguage && key === 'serverError'))?.phrase ?? enMessage
-        return res.status(500).json({ message })
+        console.log(e)
+        return res.status(500).json({ message: 'Что-то пошло не так...' })
     }
 })
 
-router.use('/get-result', parser.json(), async (req, res) => {
-    const acceptLanguage = (req.headers['accept-language'])
+router.post('/set-hygienical-score', commentUploadHandler, async (req, res) => {
+    try {
+        const { data } = req.body
+        const { userId } = JSON.parse(data)
+        const { value } = JSON.parse(data).note.hygienicalScore
+        const noteId = JSON.parse(data).note._id
+        const user = await UserModel.findById(userId)
+        if ( !user ) {
+            return res.status(500)
+        }
+        
+        const note = await NoteModel.findById(noteId)
+
+        if ( req.files?.length > 0 && !note ) {
+            for ( let i in req.files ) {
+                const file = req.files[i]
+                await rm(path.join(__dirname, '..', 'tmp', file.originalname))
+            }
+            res.status(500).json({ message: 'Ошибка! Оценка не сохранена...' })
+        }
+
+        if ( req.files?.length > 0 ) {
+            try {
+                await new Promise((resolve, reject) => {
+                    fs.access(path.join(__dirname, '..', 'static', 'uploads', noteId.toString()), fs.constants.F_OK, err => {
+                        if ( err ) {
+                            fs.mkdir(path.join(__dirname, '..', 'static', 'uploads', noteId.toString()), err => {
+                                if ( err ) {
+                                    reject()
+                                }
+                                else {
+                                    resolve()
+                                }
+                            })
+                        }
+                        else {
+                            resolve()
+                        }
+                    })
+                })
+            }
+            catch {
+                return res.status(500).json({ message: 'Ошибка создания каталога участника' })
+            }
+
+            const file = req.files[0]
+            try {
+                await copyFile(
+                    path.join(__dirname, '..', 'tmp', file.originalname),
+                    path.join(__dirname, '..', 'static', 'uploads', noteId.toString(), `${user.name}.webm`)
+                )
+                await rm(path.join(__dirname, '..', 'tmp', file.originalname))
+            }
+            catch (e) {
+                console.log(e)
+                await rm(path.join(__dirname, '..', 'tmp', file.originalname))
+            }
+            note.hygienicalScore = {...note.toObject().hygienicalScore, comment: `/static/uploads/${noteId.toString()}/${user.name}.webm`}
+        }
+        note.hygienicalScore = {...note.toObject().hygienicalScore, value}
+        await note.save()
+        return res.json({ message: 'Оценка принята' })
+    }
+    catch (e) {
+        console.log(e)
+        return res.status(500).json({ message: 'Что-то пошло не так...' })
+    }
+})
+
+router.post('/set-previous-score', commentUploadHandler, async (req, res) => {
+    try {
+        const { data } = req.body
+        const { userId } = JSON.parse(data)
+        const { value } = JSON.parse(data).note.previousScore
+        const noteId = JSON.parse(data).note._id
+        const user = await UserModel.findById(userId)
+        if ( !user ) {
+            return res.status(500)
+        }
+        
+        const note = await NoteModel.findById(noteId)
+
+        if ( req.files?.length > 0 && !note ) {
+            for ( let i in req.files ) {
+                const file = req.files[i]
+                await rm(path.join(__dirname, '..', 'tmp', file.originalname))
+            }
+            res.status(500).json({ message: 'Ошибка! Оценка не сохранена...' })
+        }
+
+        if ( req.files?.length > 0 ) {
+            try {
+                await new Promise((resolve, reject) => {
+                    fs.access(path.join(__dirname, '..', 'static', 'uploads', noteId.toString()), fs.constants.F_OK, err => {
+                        if ( err ) {
+                            fs.mkdir(path.join(__dirname, '..', 'static', 'uploads', noteId.toString()), err => {
+                                if ( err ) {
+                                    reject()
+                                }
+                                else {
+                                    resolve()
+                                }
+                            })
+                        }
+                        else {
+                            resolve()
+                        }
+                    })
+                })
+            }
+            catch {
+                return res.status(500).json({ message: 'Ошибка создания каталога участника' })
+            }
+
+            const file = req.files[0]
+            try {
+                await copyFile(
+                    path.join(__dirname, '..', 'tmp', file.originalname),
+                    path.join(__dirname, '..', 'static', 'uploads', noteId.toString(), `${user.name}.webm`)
+                )
+                await rm(path.join(__dirname, '..', 'tmp', file.originalname))
+            }
+            catch (e) {
+                console.log(e)
+                await rm(path.join(__dirname, '..', 'tmp', file.originalname))
+            }
+            note.previousScore = {...note.toObject().previousScore, comment: `/static/uploads/${noteId.toString()}/${user.name}.webm`}
+        }
+        note.previousScore = {...note.toObject().previousScore, value}
+        await note.save()
+        return res.json({ message: 'Оценка принята' })
+    }
+    catch (e) {
+        console.log(e)
+        return res.status(500).json({ message: 'Что-то пошло не так...' })
+    }
+})
+
+router.post('/set-referee-scores', commentUploadHandler, async (req, res) => {
+
+    try {
+        const { scores, userId, noteId } = JSON.parse(req.body.data)
+
+        const note = await NoteModel.findById(noteId)
+        if ( !note ) {
+            for ( let i in req.files ) {
+                const file = req.files[i]
+                await rm(path.join(__dirname, '..', 'tmp', file.originalname))
+            }
+            res.status(500).json({ message: 'Ошибка! Запись не найдена...' })
+        }
+
+        const competition = await CompetitionModel.findOne({ status: COMP_ST.started })
+        if ( !competition ) {
+            for ( let i in req.files ) {
+                const file = req.files[i]
+                await rm(path.join(__dirname, '..', 'tmp', file.originalname))
+            }
+            return res.status(500).json({ message: 'Нет запущенного мероприятия' })
+        }
+
+        if (
+            !competition.categories
+            .find(({category}) => category.toString() === note.category.toString())
+            ?.referees.some(({referee}) => referee.toString() === userId.toString())
+        ) {
+            for ( let i in req.files ) {
+                const file = req.files[i]
+                await rm(path.join(__dirname, '..', 'tmp', file.originalname))
+            }
+            return res.status(500).json({ message: 'Судья не допущен к судейству данной категории' })
+        }
+
+        if ( req.files?.length > 0 ) {
+            try {
+                await new Promise((resolve, reject) => {
+                    fs.access(path.join(__dirname, '..', 'static', 'uploads', noteId.toString()), fs.constants.F_OK, err => {
+                        if ( err ) {
+                            fs.mkdir(path.join(__dirname, '..', 'static', 'uploads', noteId.toString()), err => {
+                                if ( err ) {
+                                    reject()
+                                }
+                                else {
+                                    resolve()
+                                }
+                            })
+                        }
+                        else {
+                            resolve()
+                        }
+                    })
+                })
+            }
+            catch {
+                return res.status(500).json({ message: 'Ошибка создания каталога участника' })
+            }
+        }
+
+        const user = await UserModel.findById(userId)
+        const category = await CategoryModel.findById(note.category)
+        const oldRefereeScores = note.scores.find(({referee}) => referee.toString() === userId.toString())?.refereeScores ?? []
+        const refereeScores = []
+        for (let key in scores) {
+            const oldComment = oldRefereeScores.find(({test}) => test.toString() === key)?.comment
+            const fileOriginalname = `${noteId.toString()}_${userId.toString()}_${key}.webm`
+            const taskName = category.tasks.find(({_id}) => _id.toString() === key)?.name ?? '_'
+            const commentName = `${user.name}_${taskName}.webm`
+            if ( req.files?.some(file => file.originalname === fileOriginalname) ) {
+                await copyFile(
+                    path.join(__dirname, '..', 'tmp', fileOriginalname),
+                    path.join(__dirname, '..', 'static', 'uploads', noteId.toString(), commentName)
+                )
+                await rm(path.join(__dirname, '..', 'tmp', fileOriginalname))
+                refereeScores.push({
+                    test: mongoose.Types.ObjectId(key),
+                    value: scores[key].value,
+                    comment: `/static/uploads/${noteId.toString()}/${commentName}`
+                })
+            }
+            else {
+                if ( oldComment ) {
+                    refereeScores.push({
+                        test: mongoose.Types.ObjectId(key),
+                        value: scores[key].value,
+                        comment: oldComment
+                    })
+                }
+                else {
+                    refereeScores.push({
+                        test: mongoose.Types.ObjectId(key),
+                        value: scores[key].value
+                    })
+                }
+            }
+        }
+
+        const index = note.scores.findIndex(({referee}) => referee.toString() === userId.toString())
+        if ( index === -1 ) {
+            note.scores.push({ referee: userId, refereeScores })
+        }
+        else {
+            note.scores.splice(index, 1, { referee: userId, refereeScores })
+        }
+        if (
+            competition.categories
+            .find(({category}) => category.toString() === note.category.toString())
+            ?.referees.length === note.scores.length
+        ) {
+            note.completed = true
+            note.refereeTotal = note.scores
+                .reduce((arr, {refereeScores}) => arr.concat(refereeScores), [])
+                .reduce((sum, {value}) => sum + value, 0)
+            note.total = note.refereeTotal + note.previousScore.value + note.hygienicalScore.value
+            note.middle = Math.round(1000 * note.total / (note.scores.length + 2) / category.tasks.length) / 1000
+        }
+        note.lastReferee = userId
+        await note.save()
+        res.json({ message: 'Оценка принята' })
+    }
+    catch (e) {
+        console.log(e)
+        return res.status(500).json({ message: 'Что-то пошло не так...' })
+    }
+})
+
+router.post('/get-result', parser.json(), async (req, res) => {
     try {
         const { screenId } = req.body
 
         const competition = await CompetitionModel.findOne({ status: COMP_ST.started })
 
         if ( !competition ) {
-            log.error('Попытка получения экрана без запущенного мероприятия')
-            return res.status(500).json({ title: '', result: [] })
+            return res.status(500).json({ message: 'Нет запущенного мероприятия' })
         }
 
-        const { category, final } = competition.screens?.find(item => item.screenId.toString() === screenId.toString()) ?? {}
-        const { refereeSetting } = competition
-        if ( !category ) {
-            log.error(`Не удалось получить категорию для экрана ${screenId}`)
-            return res.status(500).json({ title: '', result: [] })
+        const screen = competition.screens.find(({screen}) => screen.toString() === screenId.toString())
+        if ( !screen ) {
+            console.log('Экран не найден')
+            return res.status(500).json({ message: 'Экран не найден' })
         }
+
+        const notes = await NoteModel.aggregate([
+            { $match: { competitionId: competition._id } },
+            { $lookup: { from: 'categories', localField: 'category', foreignField: '_id', as: 'fromCategories' } },
+            { $lookup: { from: 'masters', localField: 'master', foreignField: '_id', as: 'fromMasters' } },
+            { $replaceRoot: { newRoot: { $mergeObjects: [ "$$ROOT", {
+                category: { $arrayElemAt: [ "$fromCategories", 0 ] },
+                master: { $arrayElemAt: [ "$fromMasters", 0 ] }
+            } ] } } }
+        ])
 
         const users = await UserModel.find()
-        const masters = await MasterModel.find()
+        const categories = await CategoryModel.find()
 
-        const allReferees = refereeSetting.find(item => item.category === category)?.referees ?? []
-        const targetReferees = final ? allReferees.filter(({role}) => role === ROLE.referee) : allReferees.filter(({hide, role}) => (!hide && (role === ROLE.referee)))
-
-        const notes = await NoteModel.find({ competitionId: competition._id, category, completed: true })
-
-        const result = notes.map(note => {
-            const name = masters.find(({_id}) => _id.toString() === note.master.toString())?.name ?? 'Master'
-
-            const scores = targetReferees.map(({refereeId}) => {
-                const name = users.find(({_id}) => _id.toString() === refereeId.toString())?.name ?? 'Referee'
-                const scoresByCurrReferee = note.scores.find(score => score.refereeId.toString() === refereeId.toString())?.refereeScores ?? []
-                const value = scoresByCurrReferee.reduce((sum, item) => sum + item.value, 0)
-                return { name, value }
+        const rows = notes
+            .filter(({category}) => screen.categories.some(item => item.toString() === category.toString()))
+            .filter( ({updatedAt}) => updatedAt >= ( Math.floor((Date.now / 1000) - 60) ) )
+            .sort((a, b) => a.updatedAt - b.updatedAt)
+            .slice(-4)
+            .map(note => {
+                const name = note.master.name ?? ''
+                const referee = users.find(({_id}) => _id.toString() === note.lastReferee.toString())
+                const scores = note.scores
+                    .find(({referee}) => referee.toString() === note.lastReferee.toString())
+                    ?.refereeScores.map(item => {
+                        const test = categories
+                            .find(({_id}) => _id.toString() === note.categoryId.toString())
+                            ?.tasks.find(({_id}) => _id.toString() === item.test.toString())
+                            ?.name ?? ''
+                        return { test, value: item.value }
+                    }) ?? []
+                return { _id, name, referee, scores }
             })
 
-            const total = scores.reduce((sum, item) => sum + item.value, 0)
+        const tables = screen.categories.map(categoryId => {
+            const category = categories.find(({_id}) => _id.toString() === categoryId.toString()).name
+            const data = notes
+                .filter(({category, completed}) => completed && category.toString() === categoryId.toString())
+                .map(({_id, master, total}) => ({ _id, name: master.name, total }))
+                .sort((a, b) => b.total - a.total)
+            return { category, data }
+        })
 
-            return { noteId: note._id, name, scores, total }
-        }).sort((a, b) => b.total - a.total)
-        
-        res.json({ category, final, result })
+        const complete = notes
+            .filter(({category}) => screen.categories.some(item => item.toString() === category.toString()))
+            .filter( ({updatedAt}) => updatedAt >= ( Math.floor((Date.now / 1000) - 15) ) )
+            .sort((a, b) => b.updatedAt - a.updatedAt)
+            .slice(0, 1)
+            .map(note => {
+                const scores = note.scores.map(score => {
+                    const referee = users.find(({_id}) => _id.toString() === score.referee.toString())?.name ?? 'Имя судьи'
+                    const refereeScores = score.refereeScores(item => ({
+                        ...item, test: categories
+                            .find(({_id}) => _id.toString() === note.category.toString())
+                            ?.tasks.find(({_id}) => _id.toString() === item.test.toString())
+                            ?.name ?? 'Критерий'
+                    }))
+                    return { referee, refereeScores }
+                })
+                return { _id: note._id, name: note.master.name, scores }
+            })[0]
+
+        res.json({ complete, rows, tables })
     }
     catch (e) {
-        log.error(e)
-        const enMessage = global.dictionary.find(({lang, key}) => (lang === 'EN' && key === 'serverError')).phrase
-        const message = global.dictionary.find(({lang, key}) => (lang === acceptLanguage && key === 'serverError'))?.phrase ?? enMessage
-        return res.status(500).json({ message })
+        console.log(e)
+        return res.status(500).json({ message: e })
     }
 })
 

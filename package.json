@@ -7,7 +7,11 @@
     "admin": "npm run start --prefix admin",
     "admin:install": "npm install --prefix admin",
     "admin:build": "npm run build --prefix admin",
-    "admin-dev": "cross-env concurrently \"npm run server\" \"npm run admin\"",
+    "admin-dev": "concurrently \"npm run server\" \"npm run admin\"",
+    "evalution": "npm run start --prefix evalution",
+    "evalution:install": "npm install --prefix evalution",
+    "evalution:build": "npm run build --prefix evalution",
+    "evalution-dev": "concurrently \"npm run server\" \"npm run evalution\"",
     "start": "cross-env NODE_ENV=production node app",
     "server": "nodemon app.js"
   },

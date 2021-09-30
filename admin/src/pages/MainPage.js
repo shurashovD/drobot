@@ -5,6 +5,7 @@ export const MainPage = () => {
     const links = [
         {to: '/admin/competitions', title: 'Мероприятия'},
         {to: '/admin/users', title: 'Пользователи'},
+        {to: '/admin/masters', title: 'Мастеры'},
         {to: '/admin/categories', title: 'Категории'},
     ]
 

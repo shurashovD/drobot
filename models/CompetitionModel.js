@@ -1,32 +1,25 @@
 const { model, Schema, Types } = require('mongoose')
-const { feathering } = require('../types/categoryTypes')
-const { screen } = require('../types/refereeRoles')
+const { created } = require('../types/competitionStatuses')
+const { referee, screen } = require('../types/refereeRoles')
 
 const competitionSchema = new Schema({
-    competitionName: String,
-    competitionPlace: String,
-    competitionDate: {
-        from: Date,
-        to: Date
-    },
-    status: String,
-    refereeSetting: [
+    name: String,
+    status: { type: String, default: created },
+    categories: [
         {
-            category: String,
+            category: { type: Types.ObjectId, ref: 'Category' },
             referees: [
                 {
-                    refereeId: { type: Types.ObjectId, ref: 'User' },
-                    role: String,
-                    hide: Boolean
+                    referee: { type: Types.ObjectId, ref: 'User' },
+                    role: { type: String, default: referee }
                 }
             ]
         }
     ],
     screens: [
         {
-            screenId: { type: Types.ObjectId, ref: 'User' },
-            final: { type: Boolean, default: false },
-            category: { type: String, default: feathering },
+            screen: { type: Types.ObjectId, ref: 'User' },
+            categories: [{ type: Types.ObjectId, ref: 'Category' }],
             role: { type: String, default: screen }
         }
     ]
