@@ -39,35 +39,6 @@ const commentStorage = multer.diskStorage({
 const commentUpload = multer({ storage: commentStorage })
 const commentUploadHandler = commentUpload.array('comment', 20)
 
-const rmFile = filePath => {
-    return new Promise((resolve, reject) => {
-        fs.access(filePath, fs.constants.F_OK, err => {
-            if ( !err ) {
-                fs.rm(filePath, err => {
-                    if ( err ) {
-                        reject(err)
-                    }
-                    resolve()
-                })
-            }
-            resolve()
-        })
-    })
-}
-
-const renameFile = (filePath, newPath) => {
-    return new Promise((resolve, reject) => {
-        fs.rename(filePath, newPath,
-            err => {
-                if ( err ) {
-                    reject(err)
-                }
-                resolve()
-            }
-        )
-    })
-}
-
 router.post('/add-note', parser.json(), async (req, res) => {
     try {
         const { name, mail, category, rfid } = req.body.data
@@ -81,8 +52,9 @@ router.post('/add-note', parser.json(), async (req, res) => {
         }
 
         const notes = await NoteModel.find({ competitionId: competition._id })
+        const stage = competition.stages.find(({categories}) => categories.some(item => item.toString() === category.toString())) ?? [category]
         const lastNumberInCurrentCompetition = notes
-            .filter(note => note.category.toString() === category.toString())
+            .filter(note => stage.some(item => item.toString() === note.category.toString()))
             .sort((a, b) => b.number - a.number)[0]?.number ?? 0
 
         // метка занята;
