@@ -49,7 +49,7 @@ router.post('/add-master', upload.single('avatar'), async (req, res) => {
           if ( req.file ) {
               await fs.rm(path.join(__dirname, '..', 'static', 'avatars', req.file.filename))
           }
-          res.status(500).json({ message: 'Такое имя уже есть' })
+          return res.status(500).json({ message: 'Такое имя уже есть' })
       }
 
       const master = await MasterModel({ name, mail, link }).save()
@@ -73,11 +73,11 @@ router.post('/add-master', upload.single('avatar'), async (req, res) => {
             await master.save()
       }
 
-      res.status(201).json({ message: 'Мастер создан' })
+      return res.status(201).json({ message: 'Мастер создан' })
     }
     catch (e) {
         console.log(e)
-        res.status(500).json({ message: 'Что-то пошло не так...' })
+        return res.status(500).json({ message: 'Что-то пошло не так...' })
     }
 })
 

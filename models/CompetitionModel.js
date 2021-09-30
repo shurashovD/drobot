@@ -22,6 +22,12 @@ const competitionSchema = new Schema({
             categories: [{ type: Types.ObjectId, ref: 'Category' }],
             role: { type: String, default: screen }
         }
+    ],
+    stages: [
+        {
+            number: Number,
+            categories: [{ type: Types.ObjectId, ref: 'Category' }]
+        }
     ]
 })
 

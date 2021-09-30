@@ -8,7 +8,7 @@ import { COMPETITION_STATUS_CREATED, COMPETITION_STATUS_FINISHED, COMPETITION_ST
 import { COMPETITION_ROLE_FINAL_SCREEN, COMPETITION_ROLE_HYHINICAL, COMPETITION_ROLE_PHOTO, COMPETITION_ROLE_PREV, COMPETITION_ROLE_REFEREE, COMPETITION_ROLE_REGISTER, COMPETITION_ROLE_SCREEN } from "../redux/refereeRoles"
 
 export const AddCompetitionPage = () => {
-    const [competition, setCompetition] = useState({name: '', status: COMPETITION_STATUS_CREATED, categories: [], screens: []})
+    const [competition, setCompetition] = useState({name: '', status: COMPETITION_STATUS_CREATED, categories: [], screens: [], stages: []})
     const [categDropdown, setCategDropdown] = useState([])
     const [categInput, setCategInput] = useState('')
     const candidateCategory = useRef()
@@ -247,6 +247,49 @@ export const AddCompetitionPage = () => {
         }))
     }
 
+    const addStageBtnHandler = () => {
+        const number = Math.max(...competition.stages.map(({number}) => number), 0) + 1
+        setCompetition(state => ({
+            ...state, stages: state.stages.concat([{ _id: performance.now(), number, categories: [] }])
+        }))
+    }
+
+    const stageAccordeonHandler = event => {
+        const id = event.target.getAttribute('data-stage-id')
+        setCompetition(state => ({
+            ...state,
+            stages: state.stages.map(item => 
+                {
+                    return {...item, show: (item._id.toString() === id.toString()) ? !item.show : item.show}
+                }
+            )
+        }))
+    }
+
+    const rmStageHandler = event => {
+        const id = event.target.getAttribute('data-stage-id')
+        setCompetition(state => ({
+            ...state,
+            stages: state.stages.filter(({_id}) => _id.toString() !== id.toString())
+        }))
+    }
+
+    const stageCategoryHandler = event => {
+        const stageId = event.target.getAttribute('data-stage-id')
+        const categoryId = event.target.getAttribute('data-category-id')
+        setCompetition(state => ({
+            ...state,
+            stages: state.stages.map(item => {
+                if ( item._id.toString() === stageId.toString() ) {
+                    const categories = event.target.checked ?
+                        item.categories.concat([categoryId]) : item.categories.filter(cId => cId.toString() !== categoryId.toString())
+                    return { ...item, categories }
+                }
+                return item
+            })
+        }))
+    }
+
     const saveHandler = async () => {
         const data = {
             ...competition,
@@ -260,7 +303,10 @@ export const AddCompetitionPage = () => {
                 const categories = item.categories.map(({_id}) => _id)
                 const role = item.role
                 return { screen, categories, role }
-            })
+            }),
+            stages: competition.stages.map(item => (
+                { number: item.number, categories: item.categories }
+            ))
         }
         try {
             const {message} = await request('/api/competitions/add-competition', 'POST', { competition: data})
@@ -285,7 +331,10 @@ export const AddCompetitionPage = () => {
                 const categories = item.categories.map(({_id}) => _id)
                 const role = item.role
                 return { screen, categories, role }
-            })
+            }),
+            stages: competition.stages.map(item => (
+                { number: item.number, categories: item.categories }
+            ))
         }
         try {
             const {message} = await request('/api/competitions/update-competition', 'POST', {id: params.id, competition: data})
@@ -475,6 +524,62 @@ export const AddCompetitionPage = () => {
                         Добавить
                     </button>
                 </div>
+                <h4>Этапы</h4>
+                {
+                    competition.stages.map(({_id, number, categories, show}) => {
+                        return (
+                            <div className="accordion mb-1" key={_id}>
+                                <div className="accordion-item">
+                                    <h2 className="accordion-header">
+                                        <button className={"accordion-button " + (!show && "collapsed")} type="button"
+                                            data-stage-id={_id}
+                                            onClick={stageAccordeonHandler}
+                                        >
+                                            Этап {number}
+                                        </button>
+                                    </h2>
+                                    <div className={"accordion-collapse collapse " + (show && "show")}>
+                                        <div className="accordion-body">
+                                            <div className="row align-items-center">
+                                                <button className="col btn btn-outline-danger my-1 col-auto" type="button"
+                                                    data-stage-id={_id}
+                                                    onClick={rmStageHandler}
+                                                >
+                                                    Удалить этап
+                                                </button>
+                                            </div>
+                                            {
+                                                competition.categories?.length > 0 &&
+                                                <ul className="list-group">
+                                                    {
+                                                        competition.categories.map(({category}) => (
+                                                            <li className="list-group-item" key={`stage-category-${category._id}`}>
+                                                                <input className="form-check-input me-1" type="checkbox"
+                                                                    data-category-id={category._id}
+                                                                    data-stage-id={_id}
+                                                                    checked={
+                                                                        categories.some(item => item.toString() === category._id.toString())
+                                                                    }
+                                                                    onChange={stageCategoryHandler}
+                                                                />
+                                                                {category.name}
+                                                            </li>
+                                                        ))
+                                                    }
+                                                </ul>
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )
+                    })
+                }
+                <div className="row mb-3">
+                    <button className="btn btn-primary col-auto" onClick={addStageBtnHandler}>
+                        Добавить
+                    </button>
+                </div>
                 <h4>Экраны</h4>
                 {
                     competition.screens.map(({screen, categories, role, show}) => {
@@ -516,9 +621,7 @@ export const AddCompetitionPage = () => {
                                                                     data-category-id={category._id}
                                                                     data-screen-id={_id}
                                                                     checked={
-                                                                        competition.screens
-                                                                            .find(({screen}) => screen._id.toString() === _id.toString())
-                                                                            ?.categories.some(item => item._id.toString() === category._id.toString())
+                                                                        categories.some(item => item._id.toString() === category._id.toString())
                                                                     }
                                                                     onChange={screenCategoryHandler}
                                                                 />

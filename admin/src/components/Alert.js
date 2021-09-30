@@ -8,7 +8,7 @@ export const Alert = () => {
     const dispatch = useDispatch()
 
     return show ? (
-        <div className="position-absolute top-0 left-center w-100 m-0 p-1">
+        <div className="position-fixed top-0 left-center w-100 m-0 p-1">
             <div className={"d-flex justify-content-between alert " + (type === ALERT_ERROR ? "alert-danger" : "alert-success")}>
                 { text }
                 <button className="ms-auto btn-close" onClick={() => dispatch(setAlert({show: false}))} />
