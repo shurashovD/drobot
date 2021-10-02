@@ -69,7 +69,6 @@ export const RefereePage = () => {
             event.preventDefault()
             return
         }
-        event.target.value = ''
     }
 
     const scoreHandler = event => {
@@ -78,8 +77,8 @@ export const RefereePage = () => {
             value = 0
         }
         else {
-            if ( parseInt(value) > 5 ) {
-                value = 5
+            if ( parseInt(value) > 50 ) {
+                value = 50
             }
             if ( value.length > 1 ) {
                 value = parseInt(value.slice(1))
@@ -117,7 +116,7 @@ export const RefereePage = () => {
             clearFile()
             micBusy.current = null
         }
-    }, [file, clearFile, comments])
+    }, [file, clearFile, comments, note._id, id])
     
     useEffect(() => {
         if ( error ) {

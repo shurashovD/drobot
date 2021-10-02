@@ -213,11 +213,59 @@ router.post('/prev-register', parser.json(), async (req, res) => {
         for ( let i in notes ) {
             const note = notes[i]
             note.number = stageTables.find(item => item.tables.some(table => table?.toString() === note.master.toString()))
-                .tables.findIndex(item => item.toString() === note.master.toString()) + 1
+                .tables.findIndex(item => item?.toString() === note.master.toString()) + 1
             await note.save()
         }
 
         return res.json({ message: 'Участник зарегистрирован' })
+    }
+    catch (e) {
+        console.log(e)
+        return res.status(500).json({ message: 'Что-то пошло не так...' })
+    }
+})
+
+router.post('/set-rfid', parser.json(), async (req, res) => {
+    try {
+        const { category, phone, rfid, noteId, random } = req.body
+
+        const note = await NoteModel.findById(noteId)
+        if ( !random && note.rfid?.length > 0 ) {
+            return res.status(500).json({ message: 'К мастеру уже привязан участник в текущем мероприятии' })
+        }
+
+        const competition = await CompetitionModel.findOne({ status: COMP_ST.started })
+        if ( !competition ) {
+            return res.status(500).json({ message: 'Нет запущенного мероприятия' })
+        }
+
+        let cursor = await NoteModel.findOne({ competitionId: competition._id, completed: false, rfid })
+        if ( cursor ) {
+            return res.status(500).json({ message: 'Метка занята' })
+        }
+
+        if ( random ) {
+            const notes = await NoteModel.find({
+                competitionId: competition._id,
+                category: mongoose.Types.ObjectId(category),
+                rfid: { $exists: false }
+            })
+            if ( notes.length === 0 ) {
+                return res.status(500).json({ message: 'Ошибка! Нет свободных мастеров в данной номинации...' })
+            }
+            const randomIndex = Math.floor(Math.random() * notes.length)
+            const note = notes[randomIndex]
+            note.rfid = rfid
+            note.phone = phone
+            await note.save()
+            return res.json({ message: `Выполнено. Номер стола мастера: ${note.number}` })
+        }
+
+        note.rfid = rfid
+        note.phone = phone
+        await note.save()
+
+        return res.json({ message: `Выполнено. Номер стола мастера: ${note.number}` })
     }
     catch (e) {
         console.log(e)
@@ -234,7 +282,7 @@ router.post('/get-by-master', parser.json(), async (req, res) => {
 
         const result = notes.map(note => {
             const category = categories.find(({_id}) => _id.toString() === note.category.toString())
-            return { ...note, category, master }
+            return { ...note.toObject(), category, master }
         })
 
         res.json(result)
@@ -267,7 +315,7 @@ router.post('/get-note-by-rfid', parser.json(), async (req, res) => {
         const result = notes.map(note => {
             const category = categories.find(({_id}) => _id.toString() === note.category.toString())
             const master = masters.find(({_id}) => _id.toString() === note.master.toString())
-            return { ...note, category, master }
+            return { ...note.toObject(), category, master }
         })
 
         res.json(result)
@@ -288,24 +336,16 @@ router.post('/get-note-by-number', parser.json(), async (req, res) => {
             return res.status(500).json({ message: 'Нет запущенного мероприятия' })
         }
         
-        const notes = await NoteModel.aggregate([
-            {
-                $match: { number: parseInt(number), competitionId: competition._id, category }
-            },
-            {
-                $lookup: {
-                    from: 'masters',
-                    localField: 'master',
-                    foreignField: '_id',
-                    as: 'master'
-                }
-            }
-        ])
-    
-        if ( notes[0] ) {
-            return res.json(notes[0])
+        const note = await NoteModel.findOne({ category: mongoose.Types.ObjectId(category), number })
+        if ( !note ) {
+            return res.json({ none: true })
         }
-        return res.status(500).json({ message: 'Участник не найден...' })
+        const categories = await CategoryModel.find()
+        const masters = await MasterModel.find()
+        const result = note.toObject()
+        result.category = categories.find(({_id}) => _id.toString() === note.category.toString())
+        result.master = masters.find(({_id}) => _id.toString() === note.master.toString())
+        return res.json(result)
     }
     catch (e) {
         console.log(e);
@@ -397,7 +437,7 @@ router.post('/set-hygienical-score', commentUploadHandler, async (req, res) => {
     try {
         const { data } = req.body
         const { userId } = JSON.parse(data)
-        const { value } = JSON.parse(data).note.hygienicalScore
+        const { hygienicalScore, previousScore } = JSON.parse(data).note
         const noteId = JSON.parse(data).note._id
         const user = await UserModel.findById(userId)
         if ( !user ) {
@@ -452,7 +492,8 @@ router.post('/set-hygienical-score', commentUploadHandler, async (req, res) => {
             }
             note.hygienicalScore = {...note.toObject().hygienicalScore, comment: `/static/uploads/${noteId.toString()}/${user.name}.webm`}
         }
-        note.hygienicalScore = {...note.toObject().hygienicalScore, value, referee: userId}
+        note.hygienicalScore = {...note.toObject().hygienicalScore, value: hygienicalScore.value, referee: userId}
+        note.previousScore = {...note.toObject().previousScore, value: previousScore.value, referee: userId}
         await note.save()
         return res.json({ message: 'Оценка принята' })
     }

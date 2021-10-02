@@ -4,20 +4,24 @@ import { Loader } from "../compenets/Loader"
 import { useHttp } from "../hooks/http.hook"
 import { useAlert } from "../hooks/alert.hook"
 import { Rfid } from "../compenets/Rfid"
+import checkboxImg from "../img/checkbox.svg"
 
 export const RegisterPage = () => {
-    const [form, setForm] = useState({ name: '', category: '', mail: '' })
+    const [form, setForm] = useState({ name: '', category: '', mail: '', phone: '' })
     const [categories, setCategories] = useState([])
     const [notes, setNotes] = useState([])
     const [dropdown, setDropdown] = useState([])
     const [step, setStep] = useState('text')
+    const [random, setRandom] = useState(true)
     const masterId = useRef()
+    const notesRef = useRef()
     const { request, loading, error, clearError } = useHttp()
     const { errorAlert, successAlert } = useAlert()
 
     const getNotes = useCallback(async () => {
         try {
             const response = await request('/api/notes/get-all-in-current-competition')
+            notesRef.current = response
             const result = response.reduce((arr, item) => {
                 const index = arr.findIndex(el => el.master._id.toString() === item.master._id.toString())
                 if ( index !== -1 ) {
@@ -53,11 +57,9 @@ export const RegisterPage = () => {
             setDropdown([])
         }
         else {
-            console.log(notes);
-            console.log(form.category);
             setDropdown(
                 notes.filter(({master}) => master.name.toLowerCase().includes(event.target.value.toLowerCase()))
-                    .filter(({rfid}) => !rfid)
+                    .filter(({rfid}) => !(rfid?.length === 10))
                     .filter(({categories}) => categories.some(item => item._id.toString() === form.category.toString()))
                     .slice(0, 10)
             )
@@ -67,25 +69,39 @@ export const RegisterPage = () => {
     const dropdownHandler = event => {
         const userId = event.target.getAttribute('data-user-id')
         masterId.current = userId
-        const { name, mail } = notes.find(({master}) => master._id.toString() === userId.toString())
+        const { name, mail } = notes.find(({master}) => master._id.toString() === userId.toString()).master
         setForm(state => ({...state, name, mail}))
         setDropdown([])
     }
 
+    const randomMasterHandler = ()   => {
+        setRandom(state => !state)
+    }
+
     const rfidCallback = async rfid => {
         try {
-            const { message } = await request('/api/notes/add-note', 'POST', {...form, rfid, masterId: masterId.current})
+            const note = notesRef.current
+                .find(({master, category}) => master._id.toString() === masterId.current?.toString() && form.category.toString() === category._id.toString())
+            const { message } = await request('/api/notes/set-rfid', 'POST', {...form, rfid, noteId: note?._id, random})
             successAlert(message)
             setStep('text')
-            setForm({ name: '', mail: '', category: '' })
+            setForm({ name: '', mail: '', category: '', phone: '' })
+            getNotes()
             masterId.current = null
         }
-        catch {}
+        catch(e) {console.log(e);}
     }
 
     const btnCallback = () => {
         setStep('text')
     }
+
+    useEffect(() => {
+        if ( random ) {
+            masterId.current = null
+            setForm(state => ({ ...state, name: '', mail: '' }))
+        }
+    }, [random])
 
     useEffect(() => {
         getNotes()
@@ -125,7 +141,7 @@ export const RegisterPage = () => {
                         <div className="row">
                             <p className="text-center mb-2">Фамилия, имя участника</p>
                             <input className="form-control fs-4" value={form.name}
-                                disabled={form.category === ''}
+                                disabled={(form.category === '') || random}
                                 onChange={nameChangeHandler}
                             />
                             { dropdown.length > 0 && <div className="w-100 d-block position-relative p-0">
@@ -155,14 +171,26 @@ export const RegisterPage = () => {
                     <div className="col-4">
                         <div className="row">
                             <p className="text-center mb-2">Номер телефона модели</p>
-                            <input className="form-control fs-4" disabled />
+                            <input className="form-control fs-4" value={form.phone}
+                                onChange={event => setForm(state => ({...state, phone: event.target.value}))}
+                            />
                         </div>
+                    </div>
+                </div>
+                <div className="row mt-4 gx-5 justify-content-center">
+                    <div className="col-4">
+                        <label className="row justify-content-center">
+                            <img src={checkboxImg} alt="checkbox"
+                                className={"p-1 border border-primary " + (random && "bg-primary")} style={{width: '28px'}} />
+                            <input type="checkbox" className="d-none" checked={random} onChange={randomMasterHandler} />
+                            <span className="text-primary w-auto">Случайный мастер</span>
+                        </label>
                     </div>
                 </div>
             </div> }
             { step === 'text' && <div className="row m-0 mt-auto mb-5">
                 <button className="btn btn-primary col-auto mx-auto"
-                    disabled={form.name === '' || form.category === ''}
+                    disabled={(!masterId.current && !random) || form.category === ''}
                     onClick={() => setStep('rfid')}
                 >
                     OK

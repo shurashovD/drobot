@@ -52,7 +52,6 @@ export const HygienicalPage = () => {
             event.preventDefault()
             return
         }
-        event.target.value = ''
     }
 
     const categoryHandler = event => {
@@ -61,9 +60,22 @@ export const HygienicalPage = () => {
         comment.current = null
     }
 
+    const prevHandler = event => {
+        let value = event.target.value
+        if ( value.length > 1 && value[0] === '0' ) {
+            value = value.slice(1)
+        }
+        if ( value > 20 ) value = 20
+        setNote(state => ({...state, previousScore: {...state.previousScore, value}}))
+    }
+
     const scoreHandler = event => {
-        if ( event.target.value > 5 ) event.target.value = 5
-        setNote(state => ({...state, hygienicalScore: {...state.hygienicalScore, value: event.target.value}}))
+        let value = event.target.value
+        if ( value.length > 1 && value[0] === '0' ) {
+            value = value.slice(1)
+        }
+        if ( value > 50 ) value = 50
+        setNote(state => ({...state, hygienicalScore: {...state.hygienicalScore, value}}))
     }
 
     const numberHandler = async event => {
@@ -73,7 +85,9 @@ export const HygienicalPage = () => {
         if ( form.category !== '' && event.target.value !== '' ) {
             try {
                 const response = await request('/api/notes/get-note-by-number', 'POST', {...form, number: event.target.value})
-                setNote(response)
+                if ( !response.none ) {
+                    setNote(response)
+                }
             }
             catch {}
         }
@@ -129,12 +143,25 @@ export const HygienicalPage = () => {
             </div>
             <div className="row my-auto">
                 { !loading && note && <div className="col-3 mx-auto">
-                    <p className="text-center mb-2">Оценка</p>
-                    <div className="mb-3 row">
-                        <input className="form-control fs-4 text-center" value={note.hygienicalScore.value}
-                            onChange={scoreHandler}
-                            onKeyDown={scoreKdHandler}
-                        />
+                    <div className="row mb-3 gx-5 justify-content-center">
+                        <div className="col-5">
+                            <div className="row">
+                                <p className="text-center mb-2">Кожа</p>
+                                <input className="form-control fs-4 text-center" value={note.previousScore.value}
+                                    onChange={prevHandler}
+                                    onKeyDown={scoreKdHandler}
+                                />
+                            </div>
+                        </div>
+                        <div className="col-5">
+                            <div className="row">
+                                <p className="text-center mb-2">Саннормы</p>
+                                <input className="form-control fs-4 text-center" value={note.hygienicalScore.value}
+                                    onChange={scoreHandler}
+                                    onKeyDown={scoreKdHandler}
+                                />
+                            </div>
+                        </div>
                     </div>
                     <p className="text-center mb-2">Комментарий</p>
                     <div className="row gy-3 align-items-center">
