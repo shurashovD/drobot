@@ -18,6 +18,7 @@ export const CompetitionParts = () => {
     const getNotes = useCallback(async id => {
         try {
             const response = await request('/api/notes/get-all', 'POST', {competitionId: id})
+            console.log(response);
             const result = response.reduce((arr, note) => {
                 if ( arr.some(item => item.master._id.toString() === note.master._id.toString()) ) {
                     return arr
@@ -29,6 +30,7 @@ export const CompetitionParts = () => {
                     number: note.number, master: note.master, categories
                 }])
             }, [])
+            console.log(result);
             setParts(result)
         }
         catch {}

@@ -49,7 +49,7 @@ router.get('/get-all-in-current-competition', parser.json(), async (req, res) =>
         const result = notes.map(note => {
             const category = categories.find(({_id}) => _id.toString() === note.category.toString())
             const master = masters.find(({_id}) => _id.toString() === note.master.toString())
-            return { ...note, category, master }
+            return { ...note.toObject(), category, master }
         })
 
         res.json(result)
@@ -70,7 +70,7 @@ router.post('/get-all', parser.json(), async (req, res) => {
         const result = notes.map(note => {
             const category = categories.find(({_id}) => _id.toString() === note.category.toString())
             const master = masters.find(({_id}) => _id.toString() === note.master.toString())
-            return { ...note, category, master }
+            return { ...note.toObject(), category, master }
         })
 
         res.json(result)
