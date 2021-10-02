@@ -42,16 +42,17 @@ const commentUploadHandler = commentUpload.array('comment', 20)
 router.get('/get-all-in-current-competition', parser.json(), async (req, res) => {
     try {
         const competition = await CompetitionModel.findOne({ status: COMP_ST.started })
-        const notes = await NoteModel.aggregate([
-            { $match: { competitionId: competition._id } },
-            { $lookup: { from: 'categories', localField: 'category', foreignField: '_id', as: 'fromCategories' } },
-            { $lookup: { from: 'masters', localField: 'master', foreignField: '_id', as: 'fromMasters' } },
-            { $replaceRoot: { newRoot: { $mergeObjects: [ "$$ROOT", {
-                category: { $arrayElemAt: [ "$fromCategories", 0 ] },
-                master: { $arrayElemAt: [ "$fromMasters", 0 ] }
-            } ] } } }
-        ])
-        res.json(notes)
+        const categories = await CategoryModel.find()
+        const masters = await MasterModel.find()
+        const notes = await NoteModel.find({ competitionId: competition._id })
+
+        const result = notes.map(note => {
+            const category = categories.find(({_id}) => _id.toString() === note.category.toString())
+            const master = masters.find(({_id}) => _id.toString() === note.master.toString())
+            return { ...note, category, master }
+        })
+
+        res.json(result)
     }
     catch (e) {
         console.log(e)
@@ -62,16 +63,17 @@ router.get('/get-all-in-current-competition', parser.json(), async (req, res) =>
 router.post('/get-all', parser.json(), async (req, res) => {
     try {
         const { competitionId } = req.body
-        const notes = await NoteModel.aggregate([
-            { $match: { competitionId: mongoose.Types.ObjectId(competitionId) } },
-            { $lookup: { from: 'categories', localField: 'category', foreignField: '_id', as: 'fromCategories' } },
-            { $lookup: { from: 'masters', localField: 'master', foreignField: '_id', as: 'fromMasters' } },
-            { $replaceRoot: { newRoot: { $mergeObjects: [ "$$ROOT", {
-                category: { $arrayElemAt: [ "$fromCategories", 0 ] },
-                master: { $arrayElemAt: [ "$fromMasters", 0 ] }
-            } ] } } }
-        ])
-        res.json(notes)
+        const categories = await CategoryModel.find()
+        const masters = await MasterModel.find()
+        const notes = await NoteModel.find({ competitionId: mongoose.Types.ObjectId(competitionId) })
+
+        const result = notes.map(note => {
+            const category = categories.find(({_id}) => _id.toString() === note.category.toString())
+            const master = masters.find(({_id}) => _id.toString() === note.master.toString())
+            return { ...note, category, master }
+        })
+
+        res.json(result)
     }
     catch (e) {
         console.log(e)
@@ -226,16 +228,16 @@ router.post('/prev-register', parser.json(), async (req, res) => {
 router.post('/get-by-master', parser.json(), async (req, res) => {
     try {
         const { competitionId, masterId } = req.body
-        const notes = await NoteModel.aggregate([
-            { $match: { competitionId: mongoose.Types.ObjectId(competitionId), master: mongoose.Types.ObjectId(masterId) } },
-            { $lookup: { from: 'categories', localField: 'category', foreignField: '_id', as: 'fromCategories' } },
-            { $lookup: { from: 'masters', localField: 'master', foreignField: '_id', as: 'fromMasters' } },
-            { $replaceRoot: { newRoot: { $mergeObjects: [ "$$ROOT", {
-                category: { $arrayElemAt: [ "$fromCategories", 0 ] },
-                master: { $arrayElemAt: [ "$fromMasters", 0 ] }
-            } ] } } }
-        ])
-        res.json(notes)
+        const categories = await CategoryModel.find()
+        const master = await MasterModel.findById(masterId)
+        const notes = await NoteModel.find({ competitionId: mongoose.Types.ObjectId(competitionId), master: master._id })
+
+        const result = notes.map(note => {
+            const category = categories.find(({_id}) => _id.toString() === note.category.toString())
+            return { ...note, category, master }
+        })
+
+        res.json(result)
     }
     catch (e) {
         console.log(e)
@@ -258,18 +260,17 @@ router.post('/rm-by-master', parser.json(), async (req, res) => {
 router.post('/get-note-by-rfid', parser.json(), async (req, res) => {
     try {
         const { rfid } = req.body
-        const notes = await NoteModel.aggregate([
-            { $match: { rfid } },
-            { $lookup: { from: 'categories', localField: 'category', foreignField: '_id', as: 'fromCategories' } },
-            { $lookup: { from: 'masters', localField: 'master', foreignField: '_id', as: 'fromMasters' } },
-            { $replaceRoot: { newRoot: { $mergeObjects: [ "$$ROOT", {
-                category: { $arrayElemAt: [ "$fromCategories", 0 ] },
-                master: { $arrayElemAt: [ "$fromMasters", 0 ] }
-            } ] } } }
-        ])
-        if ( notes[0] ) {
-            return res.json(notes[0])
-        }
+        const categories = await CategoryModel.find()
+        const masters = await MasterModel.find()
+        const notes = await NoteModel.find({ rfid })
+
+        const result = notes.map(note => {
+            const category = categories.find(({_id}) => _id.toString() === note.category.toString())
+            const master = masters.find(({_id}) => _id.toString() === note.master.toString())
+            return { ...note, category, master }
+        })
+
+        res.json(result)
         return res.status(500).json({ message: 'Участник не найден...' })
     }
     catch (e) {

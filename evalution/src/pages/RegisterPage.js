@@ -48,7 +48,7 @@ export const RegisterPage = () => {
 
     const nameChangeHandler = event => {
         masterId.current = null
-        setForm({ name: event.target.value, mail: '' })
+        setForm(state => ({ ...state, name: event.target.value, mail: '' }))
         if ( event.target.value === '' ) {
             setDropdown([])
         }
