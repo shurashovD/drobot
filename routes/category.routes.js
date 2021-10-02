@@ -2,11 +2,27 @@ const router = require('express').Router()
 const bodyParser = require('body-parser')
 
 const CategoryModel = require('../models/CategoryModel')
+const CompetitionModel = require('../models/CompetitionModel')
+
+const COMP_ST = require('../types/competitionStatuses')
 
 router.get('/get-all', async (req, res) => {
     try {
         const categories = await CategoryModel.find()
         res.json(categories)
+    }
+    catch (e) {
+        console.log(e);
+        res.status(500).json({ message: 'Что-то пошло не так...' })
+    }
+})
+
+router.get('/get-by-current-cometition', async (req, res) => {
+    try {
+        const categories = await CategoryModel.find()
+        const competition = await CompetitionModel.findOne({ status: COMP_ST.started })
+        const result = competition.categories.map(({category}) => categories.find(({_id}) => _id.toString() === category.toString()))
+        res.json(result)
     }
     catch (e) {
         console.log(e);

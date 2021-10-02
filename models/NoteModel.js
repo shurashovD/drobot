@@ -6,15 +6,20 @@ const noteSchema = new Schema(
         competitionId: { type: Types.ObjectId, ref: 'Competition' },
         completed: { type: Boolean, default: false },
         hygienicalScore: {
-            value: { type: Number, default: 0 }, comment: String
+            comment: String,
+            referee: { type: Types.ObjectId, ref: 'User' },
+            value: { type: Number, default: 0 },
         },
         lastReferee: { type: Types.ObjectId, ref: 'User' },
         master: { type: Types.ObjectId, ref: 'Master' },
         middle: { type: Number, default: 0 },
         number: Number,
+        phone: String,
         photos: [String],
         previousScore: {
-            value: { type: Number, default: 0 }, comment: String
+            comment: String,
+            referee: { type: Types.ObjectId, ref: 'User' },
+            value: { type: Number, default: 0 },
         },
         refereeTotal: { type: Number, default: 0 },
         rfid: String,

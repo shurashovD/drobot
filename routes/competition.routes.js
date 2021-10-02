@@ -5,7 +5,6 @@ const CompetitionModel = require('../models/CompetitionModel')
 const UserModel = require('../models/UserModel')
 const CategoryModel = require('../models/CategoryModel')
 
-
 router.get('/get-all', async (req, res) => {
     try {
         const result = await CompetitionModel.find()

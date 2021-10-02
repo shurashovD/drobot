@@ -6,40 +6,60 @@ import { useAlert } from "../hooks/alert.hook"
 import { Rfid } from "../compenets/Rfid"
 
 export const RegisterPage = () => {
-    const [form, setForm] = useState({ name: '', mail: '', category: '' })
+    const [form, setForm] = useState({ name: '', category: '', mail: '' })
     const [categories, setCategories] = useState([])
-    const [masters, setMasters] = useState([])
+    const [notes, setNotes] = useState([])
     const [dropdown, setDropdown] = useState([])
     const [step, setStep] = useState('text')
     const masterId = useRef()
     const { request, loading, error, clearError } = useHttp()
     const { errorAlert, successAlert } = useAlert()
 
-    const getMasters = useCallback(async () => {
+    const getNotes = useCallback(async () => {
         try {
-            const response = await request('/api/masters/get-all')
-            setMasters(response)
+            const response = await request('/api/notes/get-all-in-current-competition')
+            const result = response.reduce((arr, item) => {
+                const index = arr.findIndex(el => el.master._id.toString() === item.master._id.toString())
+                if ( index !== -1 ) {
+                    arr[index].categories.push(item.category)
+                    return arr
+                }
+                arr.push({ master: item.master, categories: [item.category] })
+                return arr
+            }, [])
+            setNotes(result)
         }
-        catch {}
+        catch(e) {console.log(e);}
     }, [request])
 
     const getCategories = useCallback(async () => {
         try {
-            const response = await request('/api/categories/get-all')
+            const response = await request('/api/categories/get-by-current-cometition')
             setCategories(response)
         }
         catch {}
     }, [request])
 
-    const nameChangeHandler = event => {
-        setForm(state => ({...state, name: event.target.value}))
+    const selectHandler = event => {
+        setForm(state => ({...state, category: event.target.value, name: ''}))
+        setDropdown([])
         masterId.current = null
-        if ( event.target.value.length === 0 ) {
+    }
+
+    const nameChangeHandler = event => {
+        masterId.current = null
+        setForm({ name: event.target.value, mail: '' })
+        if ( event.target.value === '' ) {
             setDropdown([])
         }
         else {
+            console.log(notes);
+            console.log(form.category);
             setDropdown(
-                masters.filter(({name}) => name.toLowerCase().includes(event.target.value.toLowerCase())).slice(0, 10)
+                notes.filter(({master}) => master.name.toLowerCase().includes(event.target.value.toLowerCase()))
+                    .filter(({rfid}) => !rfid)
+                    .filter(({categories}) => categories.some(item => item._id.toString() === form.category.toString()))
+                    .slice(0, 10)
             )
         }
     }
@@ -47,17 +67,18 @@ export const RegisterPage = () => {
     const dropdownHandler = event => {
         const userId = event.target.getAttribute('data-user-id')
         masterId.current = userId
-        const { name, mail } = masters.find(({_id}) => _id.toString() === userId.toString())
+        const { name, mail } = notes.find(({master}) => master._id.toString() === userId.toString())
         setForm(state => ({...state, name, mail}))
         setDropdown([])
     }
 
     const rfidCallback = async rfid => {
         try {
-            const { message } = await request('/api/notes/add-note', 'POST', { data: {...form, rfid}, masterId: masterId.current })
+            const { message } = await request('/api/notes/add-note', 'POST', {...form, rfid, masterId: masterId.current})
             successAlert(message)
             setStep('text')
             setForm({ name: '', mail: '', category: '' })
+            masterId.current = null
         }
         catch {}
     }
@@ -67,9 +88,9 @@ export const RegisterPage = () => {
     }
 
     useEffect(() => {
-        getMasters()
+        getNotes()
         getCategories()
-    }, [getMasters, getCategories])
+    }, [getNotes, getCategories])
 
     useEffect(() => {
         if ( error ) {
@@ -84,14 +105,14 @@ export const RegisterPage = () => {
             { step === 'rfid' && <Rfid rfidCallback={rfidCallback} btnCallback={btnCallback} btnTitle="Отмена" /> }
             { step === 'text' && <Navbar title="Регистрация" /> }
             { step === 'text' && <div className="container">
-                <div className="row mt-5 gx-5">
-                    <div className="col">
+                <div className="row mt-5 gx-5 justify-content-center">
+                    <div className="col-4">
                         <div className="row">
                             <p className="text-center mb-2">Выбор категории</p>
                         </div>
                         <div className="row">
                             <select className="form-select fs-4" value={form.category}
-                                onChange={event => setForm(state => ({...state, category: event.target.value}))}
+                                onChange={selectHandler}
                             >
                                 <option value={''} className="fs-5">--Не выбрано--</option>
                                 {
@@ -100,21 +121,22 @@ export const RegisterPage = () => {
                             </select>
                         </div>
                     </div>
-                    <div className="col">
+                    <div className="col-4">
                         <div className="row">
                             <p className="text-center mb-2">Фамилия, имя участника</p>
                             <input className="form-control fs-4" value={form.name}
+                                disabled={form.category === ''}
                                 onChange={nameChangeHandler}
                             />
                             { dropdown.length > 0 && <div className="w-100 d-block position-relative p-0">
                                 <div className="list-group position-absolute w-100">
                                     {
-                                        dropdown.map(({_id, name}) => (
-                                            <button type="button" className="list-group-item list-group-item-action border-primary" key={_id}
-                                                data-user-id={_id}
+                                        dropdown.map(({master}) => (
+                                            <button type="button" className="list-group-item list-group-item-action border-primary" key={master._id}
+                                                data-user-id={master._id}
                                                 onClick={dropdownHandler}
                                             >
-                                                {name}
+                                                {master.name}
                                             </button>
                                         ))
                                     }
@@ -122,12 +144,18 @@ export const RegisterPage = () => {
                             </div> }
                         </div>
                     </div>
-                    <div className="col">
+                </div>
+                <div className="row mt-4 gx-5 justify-content-center">
+                    <div className="col-4">
                         <div className="row">
-                            <p className="text-center mb-2">Электронная почта</p>
-                            <input className="form-control fs-4" value={form.mail}
-                                onChange={event => setForm(state => ({...state, mail: event.target.value}))}
-                            />
+                            <p className="text-center mb-2">Электронная почта мастера</p>
+                            <input className="form-control fs-4" value={form.mail} disabled />
+                        </div>
+                    </div>
+                    <div className="col-4">
+                        <div className="row">
+                            <p className="text-center mb-2">Номер телефона модели</p>
+                            <input className="form-control fs-4" disabled />
                         </div>
                     </div>
                 </div>

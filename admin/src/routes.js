@@ -7,6 +7,8 @@ import { AddMasterPage } from "./pages/AddMasterPagee"
 import { AddUserPage } from "./pages/AddUserPage"
 import { AuthPage } from "./pages/AuthPage"
 import { CategoriesPage } from "./pages/CategoriesPage"
+import { CompetitionAddParts } from "./pages/CompetitionAddPart"
+import { CompetitionParts } from "./pages/CompetitionParts"
 import { CompetitionsPage } from "./pages/CompetitionsPage"
 import { MainPage } from "./pages/MainPage"
 import { MastersPage } from "./pages/MastersPage"
@@ -21,6 +23,7 @@ export const Routes = () => {
                 <Route path="/admin/main">
                     <MainPage />
                 </Route>
+
                 <Route path="/admin/competitions" exact>
                     <CompetitionsPage />
                 </Route>
@@ -30,6 +33,17 @@ export const Routes = () => {
                 <Route path="/admin/competitions/add/:id">
                     <AddCompetitionPage />
                 </Route>
+
+                <Route path="/admin/competitions/parts/:competitionId" exact>
+                    <CompetitionParts />
+                </Route>
+                <Route path="/admin/competitions/parts/add/:competitionId" exact>
+                    <CompetitionAddParts />
+                </Route>
+                <Route path="/admin/competitions/parts/add/:competitionId/:masterId">
+                    <CompetitionAddParts />
+                </Route>
+
                 <Route path="/admin/users" exact>
                     <UsersPage />
                 </Route>
@@ -39,6 +53,7 @@ export const Routes = () => {
                 <Route path="/admin/users/add/:id">
                     <AddUserPage />
                 </Route>
+
                 <Route path="/admin/masters" exact>
                     <MastersPage />
                 </Route>
@@ -48,6 +63,7 @@ export const Routes = () => {
                 <Route path="/admin/masters/add/:id">
                     <AddMasterPage />
                 </Route>
+
                 <Route path="/admin/categories" exact>
                     <CategoriesPage />
                 </Route>
@@ -57,6 +73,7 @@ export const Routes = () => {
                 <Route path="/admin/categories/add">
                     <AddCategoryPage />
                 </Route>
+
                 <Redirect to="/admin/main" />
             </Switch>
         )

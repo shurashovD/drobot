@@ -39,6 +39,46 @@ const commentStorage = multer.diskStorage({
 const commentUpload = multer({ storage: commentStorage })
 const commentUploadHandler = commentUpload.array('comment', 20)
 
+router.get('/get-all-in-current-competition', parser.json(), async (req, res) => {
+    try {
+        const competition = await CompetitionModel.findOne({ status: COMP_ST.started })
+        const notes = await NoteModel.aggregate([
+            { $match: { competitionId: competition._id } },
+            { $lookup: { from: 'categories', localField: 'category', foreignField: '_id', as: 'fromCategories' } },
+            { $lookup: { from: 'masters', localField: 'master', foreignField: '_id', as: 'fromMasters' } },
+            { $replaceRoot: { newRoot: { $mergeObjects: [ "$$ROOT", {
+                category: { $arrayElemAt: [ "$fromCategories", 0 ] },
+                master: { $arrayElemAt: [ "$fromMasters", 0 ] }
+            } ] } } }
+        ])
+        res.json(notes)
+    }
+    catch (e) {
+        console.log(e)
+        return res.status(500).json({ message: 'Что-то пошло не так...' })
+    }
+})
+
+router.post('/get-all', parser.json(), async (req, res) => {
+    try {
+        const { competitionId } = req.body
+        const notes = await NoteModel.aggregate([
+            { $match: { competitionId: mongoose.Types.ObjectId(competitionId) } },
+            { $lookup: { from: 'categories', localField: 'category', foreignField: '_id', as: 'fromCategories' } },
+            { $lookup: { from: 'masters', localField: 'master', foreignField: '_id', as: 'fromMasters' } },
+            { $replaceRoot: { newRoot: { $mergeObjects: [ "$$ROOT", {
+                category: { $arrayElemAt: [ "$fromCategories", 0 ] },
+                master: { $arrayElemAt: [ "$fromMasters", 0 ] }
+            } ] } } }
+        ])
+        res.json(notes)
+    }
+    catch (e) {
+        console.log(e)
+        return res.status(500).json({ message: 'Что-то пошло не так...' })
+    }
+})
+
 router.post('/add-note', parser.json(), async (req, res) => {
     try {
         const { name, mail, category, rfid } = req.body.data
@@ -94,6 +134,127 @@ router.post('/add-note', parser.json(), async (req, res) => {
     }
 })
 
+router.post('/prev-register', parser.json(), async (req, res) => {
+    try {
+        const { competitionId } = req.body
+        const prevNote = req.body.note
+
+        const competition = await CompetitionModel.findById(competitionId)
+
+        if ( !competition ) {
+            return res.status(500).json({ message: 'Мероприятие не найдено' })
+        }
+
+        const notesByMaster = await NoteModel.find({ master: prevNote.master._id, competitionId: competition._id })
+        for ( let i in notesByMaster ) {
+            const note = notesByMaster[i]
+            if ( !prevNote.categories.some(item => item.toString() === note.category.toString()) ) {
+                await NoteModel.findByIdAndDelete(note._id)
+            }
+        }
+        for ( let i in prevNote.categories ) {
+            const category = prevNote.categories[i]
+            if ( !notesByMaster.some(note => note.category.toString() === category.toString()) ) {
+                await NoteModel({ competitionId: competition._id, master: prevNote.master._id, category }).save()
+            }
+        }
+
+        const notes = await NoteModel.find({ competitionId: competition._id })
+
+        const stages = competition.toObject().stages
+            .map(stage => {
+                const stageNotes = notes.filter(({category}) => stage.categories.some(item => category.toString() === item.toString()))
+                return { stage, stageNotes }
+            })
+            .sort((a, b) => b.stageNotes.length - a.stageNotes.length)
+
+        const stageTables = stages.reduce((result, item) => {
+            const copy = result.slice()
+            for ( let i in item.stageNotes ) {
+                const note = item.stageNotes[i]
+                const myStageNumber = item.stage.number
+                const myStage = copy.find(({number}) => number === myStageNumber)
+                if ( myStage.tables.some(table => table?.toString() === note.master.toString()) ) {
+                    continue
+                }
+                const notesByMaster = notes.filter(({master}) => master.toString() === note.master.toString())
+                const masterStageNumbers = competition.toObject().stages
+                    .filter(({categories}) => {
+                        return categories.some(cId => {
+                            return notesByMaster.some(n => {
+                                if ( n.category.toString() === cId.toString() ) {
+                                    return true
+                                }
+                                return false
+                            })
+                        })
+                    })
+                    .map(({number}) => number)
+                const index = myStage.tables.findIndex((table, i) => {
+                    if (table === null) {
+                        const myStages = copy.filter(({number}) => masterStageNumbers.some(num => num === number))
+                        if ( myStages.every(({tables}) => tables[i] === null) ) {
+                            return true
+                        }
+                    }
+                    return false
+                })
+                copy.forEach(({number, tables}) => {
+                    if ( masterStageNumbers.some(item => item === number) ) {
+                        tables[index] = note.master._id
+                    }
+                })
+            }
+            return copy
+        }, stages.map(({stage}) => ({ number: stage.number, tables: Array.from({ length: stages[0].stageNotes.length }, () => null) })))
+
+        for ( let i in notes ) {
+            const note = notes[i]
+            note.number = stageTables.find(item => item.tables.some(table => table?.toString() === note.master.toString()))
+                .tables.findIndex(item => item.toString() === note.master.toString()) + 1
+            await note.save()
+        }
+
+        return res.json({ message: 'Участник зарегистрирован' })
+    }
+    catch (e) {
+        console.log(e)
+        return res.status(500).json({ message: 'Что-то пошло не так...' })
+    }
+})
+
+router.post('/get-by-master', parser.json(), async (req, res) => {
+    try {
+        const { competitionId, masterId } = req.body
+        const notes = await NoteModel.aggregate([
+            { $match: { competitionId: mongoose.Types.ObjectId(competitionId), master: mongoose.Types.ObjectId(masterId) } },
+            { $lookup: { from: 'categories', localField: 'category', foreignField: '_id', as: 'fromCategories' } },
+            { $lookup: { from: 'masters', localField: 'master', foreignField: '_id', as: 'fromMasters' } },
+            { $replaceRoot: { newRoot: { $mergeObjects: [ "$$ROOT", {
+                category: { $arrayElemAt: [ "$fromCategories", 0 ] },
+                master: { $arrayElemAt: [ "$fromMasters", 0 ] }
+            } ] } } }
+        ])
+        res.json(notes)
+    }
+    catch (e) {
+        console.log(e)
+        return res.status(500).json({ message: 'Что-то пошло не так...' })
+    }
+})
+
+router.post('/rm-by-master', parser.json(), async (req, res) => {
+    try {
+        const { competitionId, masterId } = req.body
+        await NoteModel.deleteMany({ competitionId, master: masterId })
+        res.json({ message: 'Участник удалён' })
+    }
+    catch (e) {
+        console.log(e)
+        return res.status(500).json({ message: 'Что-то пошло не так...' })
+    }
+})
+
 router.post('/get-note-by-rfid', parser.json(), async (req, res) => {
     try {
         const { rfid } = req.body
@@ -114,27 +275,6 @@ router.post('/get-note-by-rfid', parser.json(), async (req, res) => {
     catch (e) {
         console.log(e)
         return res.status(500).json({ message: 'Что-то пошло не так...' })
-    }
-})
-
-router.use('/get-note-for-referee', parser.json(), async (req, res) => {
-    const acceptLanguage = (req.headers['accept-language'])
-    try {
-        const { rfid } = req.body
-        const note = await NoteModel.findOne({ rfid, completed: false })
-        if ( !note ) {
-            const enMessage = global.dictionary.find(({lang, key}) => (lang === 'EN' && key === 'errorReceivingPart')).phrase
-            const message = global.dictionary.find(({lang, key}) => (lang === acceptLanguage && key === 'errorReceivingPart'))?.phrase ?? enMessage
-            return res.status(500).json({ message })
-        }
-        const tasks = await TestModel.find({ testCategoryKey: note.category })
-        res.json({ note, tasks })
-    }
-    catch (e) {
-        log.error(e)
-        const enMessage = global.dictionary.find(({lang, key}) => (lang === 'EN' && key === 'serverError')).phrase
-        const message = global.dictionary.find(({lang, key}) => (lang === acceptLanguage && key === 'serverError'))?.phrase ?? enMessage
-        return res.status(500).json({ message })
     }
 })
 
@@ -311,7 +451,7 @@ router.post('/set-hygienical-score', commentUploadHandler, async (req, res) => {
             }
             note.hygienicalScore = {...note.toObject().hygienicalScore, comment: `/static/uploads/${noteId.toString()}/${user.name}.webm`}
         }
-        note.hygienicalScore = {...note.toObject().hygienicalScore, value}
+        note.hygienicalScore = {...note.toObject().hygienicalScore, value, referee: userId}
         await note.save()
         return res.json({ message: 'Оценка принята' })
     }
@@ -380,7 +520,7 @@ router.post('/set-previous-score', commentUploadHandler, async (req, res) => {
             }
             note.previousScore = {...note.toObject().previousScore, comment: `/static/uploads/${noteId.toString()}/${user.name}.webm`}
         }
-        note.previousScore = {...note.toObject().previousScore, value}
+        note.previousScore = {...note.toObject().previousScore, value, referee: userId}
         await note.save()
         return res.json({ message: 'Оценка принята' })
     }
@@ -591,7 +731,11 @@ router.post('/get-result', parser.json(), async (req, res) => {
                     }))
                     return { referee, refereeScores }
                 })
-                return { _id: note._id, name: note.master.name, scores }
+                const hygienicalName = users.find(({_id}) => _id.toString() === note.hygienicalScore.referee?.toString())?.name
+                const hygienical = hygienicalName ? { name: hygienicalName, value: note.hygienicalScore.value } : null
+                const previousName = users.find(({_id}) => _id.toString() === note.previousScore.referee?.toString())?.name
+                const previous = hygienicalName ? { name: previousName, value: note.previousScore.value } : null
+                return { _id: note._id, name: note.master.name, scores, hygienical, previous }
             })[0]
 
         res.json({ complete, rows, tables })

@@ -1,12 +1,11 @@
 import React from "react"
-import { NavLink } from 'react-router-dom'
 import { useAuth } from "../hooks/auth.hook"
 
 export const Navbar = props => {
     const { logout } = useAuth()
 
     return (
-        <div className="row bg-light mt-3 ps-3 align-items-center">
+        <div className="row bg-light m-0 mt-3 ps-3 align-items-center">
             <div className="col-3">
                 <h4 className="mb-0">{props.title}</h4>
             </div>

@@ -53,6 +53,7 @@ export const CompetitionsPage = () => {
                         <tr>
                             <th>Название</th>
                             <th>Статус</th>
+                            <th className="text-center">Участнники</th>
                             <th className="text-center">Изменить</th>
                             <th className="text-center">Удалить</th>
                         </tr>
@@ -67,6 +68,9 @@ export const CompetitionsPage = () => {
                                     { status === COMPETITION_STATUS_STARTED && <span className="badge bg-danger">В работе</span> }
                                     { status === COMPETITION_STATUS_FINISHED && <span className="badge bg-success">Завершено</span> }
                                     { status === COMPETITION_STATUS_PUBLISHED && <span className="badge bg-secondary">Опубликовано</span> }
+                                </td>
+                                <td className="text-center">
+                                    <NavLink to={`/admin/competitions/parts/${_id}`} className="btn btn-sm btn-primary">Участники</NavLink>
                                 </td>
                                 <td className="text-center">
                                     <NavLink to={`/admin/competitions/add/${_id}`} className="btn btn-sm btn-primary">Изменить</NavLink>
