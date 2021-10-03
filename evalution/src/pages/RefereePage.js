@@ -13,6 +13,7 @@ export const RefereePage = () => {
     const [note, setNote] = useState()
     const [scores, setScores] = useState({})
     const [total, setTotal] = useState(0)
+    const [photoShow, setPhotoShow] = useState(false)
     const { request, sendFormData, loading, error, clearError } = useHttp()
     const { micClickHandler, recording, file, clearFile } = useMic()
     const { errorAlert, successAlert } = useAlert()
@@ -102,7 +103,7 @@ export const RefereePage = () => {
         micClickHandler()
     }
 
-    const photoBtnCallback = () => {}
+    const photoBtnCallback = () => setPhotoShow(true)
 
     useEffect(() => {
         console.log(note?.scores);
@@ -201,6 +202,18 @@ export const RefereePage = () => {
                     <button className="btn btn-primary col-auto" onClick={cancelHandler}>Отмена</button>
                 </div>    
             }
+            { photoShow && <div className="position-absolute top-0 left-0 container-fluid p-1 m-0">
+                <div className="row p-2 justify-content-end">
+                    <btn className="btn-close" onClick={() => setPhotoShow(false)} />
+                    {
+                        note.photos?.map(src => (
+                            <div className="row justify-content-center">
+                                <img className="img-fluid" src={src} alt="Участник" />
+                            </div>
+                        ))
+                    }
+                </div>
+            </div> }
         </div>
     )
 }

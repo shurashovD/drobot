@@ -9,6 +9,7 @@ import { AuthPage } from "./pages/AuthPage"
 import { CategoriesPage } from "./pages/CategoriesPage"
 import { CompetitionAddParts } from "./pages/CompetitionAddPart"
 import { CompetitionParts } from "./pages/CompetitionParts"
+import { CompetitionPartsDistributuion } from "./pages/CompetitionPartsDistribution"
 import { CompetitionsPage } from "./pages/CompetitionsPage"
 import { MainPage } from "./pages/MainPage"
 import { MastersPage } from "./pages/MastersPage"
@@ -42,6 +43,9 @@ export const Routes = () => {
                 </Route>
                 <Route path="/admin/competitions/parts/add/:competitionId/:masterId">
                     <CompetitionAddParts />
+                </Route>
+                <Route path="/admin/competitions/parts/distribution/:competitionId" exact>
+                    <CompetitionPartsDistributuion />
                 </Route>
 
                 <Route path="/admin/users" exact>
