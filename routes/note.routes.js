@@ -344,7 +344,7 @@ router.post('/get-note-by-rfid', parser.json(), async (req, res) => {
         const { rfid } = req.body
         const categories = await CategoryModel.find()
         const masters = await MasterModel.find()
-        const note = await NoteModel.findOne({ rfid })
+        const note = await NoteModel.findOne({ rfid, completed: false })
         if ( !note ) {
             return res.status(500).json({ message: 'Пусатя метка' })
         }
