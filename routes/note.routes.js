@@ -147,18 +147,25 @@ router.post('/prev-register', parser.json(), async (req, res) => {
             return res.status(500).json({ message: 'Мероприятие не найдено' })
         }
 
-        const notesByMaster = await NoteModel.find({ master: prevNote.master._id, competitionId: competition._id })
+        let notesByMaster = await NoteModel.find({ master: prevNote.master._id, competitionId: competition._id })
         for ( let i in notesByMaster ) {
             const note = notesByMaster[i]
-            if ( !prevNote.categories.some(item => item.toString() === note.category.toString()) ) {
+            if ( !prevNote.categories.some(({category}) => category.toString() === note.category.toString()) ) {
                 await NoteModel.findByIdAndDelete(note._id)
             }
         }
         for ( let i in prevNote.categories ) {
-            const category = prevNote.categories[i]
+            const category = prevNote.categories[i].category
+            const myModel = prevNote.categories[i].myModel
             if ( !notesByMaster.some(note => note.category.toString() === category.toString()) ) {
-                await NoteModel({ competitionId: competition._id, master: prevNote.master._id, category }).save()
+                await NoteModel({ competitionId: competition._id, master: prevNote.master._id, category, myModel }).save()
             }
+        }
+        notesByMaster = await NoteModel.find({ master: prevNote.master._id, competitionId: competition._id })
+        for ( let i in notesByMaster ) {
+            const note = notesByMaster[i]
+            note.myModel = prevNote.categories.find(({category}) => category.toString() === note.category.toString())?.myModel ?? false
+            note.save()
         }
 
         const notes = await NoteModel.find({ competitionId: competition._id })
@@ -248,7 +255,8 @@ router.post('/set-rfid', parser.json(), async (req, res) => {
             const notes = await NoteModel.find({
                 competitionId: competition._id,
                 category: mongoose.Types.ObjectId(category),
-                rfid: { $exists: false }
+                rfid: { $exists: false },
+                myModel: { $ne: true }
             })
             if ( notes.length === 0 ) {
                 return res.status(500).json({ message: 'Ошибка! Нет свободных мастеров в данной номинации...' })

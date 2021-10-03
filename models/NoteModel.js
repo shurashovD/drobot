@@ -13,6 +13,7 @@ const noteSchema = new Schema(
         lastReferee: { type: Types.ObjectId, ref: 'User' },
         master: { type: Types.ObjectId, ref: 'Master' },
         middle: { type: Number, default: 0 },
+        myModel: { type: Boolean, default: false },
         number: Number,
         phone: String,
         photos: [String],

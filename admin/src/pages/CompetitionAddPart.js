@@ -50,8 +50,11 @@ export const CompetitionAddParts = () => {
             const currMaster = masters.current.find(({_id}) => _id.toString() === id.toString())
             const response = await request('/api/notes/get-by-master', 'POST', { masterId: id, competitionId: params.competitionId })
             const result = response.reduce((res, item) => ({
-                ...res, categories: res.categories.concat(item.category._id)
-            }), { master: response[0]?.master ?? currMaster, categories: response[0]?.category ? [response[0].category._id] : [] })
+                ...res, categories: res.categories.concat({category: item.category._id, myModel: item?.myModel})
+            }), {
+                master: response[0]?.master ?? currMaster,
+                categories: response[0]?.category ? [{category: response[0].category._id, myModel: response[0]?.myModel}] : []
+            })
             setNote(result)
             setInput(result.master.name)
         }
@@ -90,8 +93,21 @@ export const CompetitionAddParts = () => {
             categories: state.categories.some(item => item.toString() === categoryId.toString()) ?
                 state.categories.filter(item => item.toString() !== categoryId.toString()) :
                 state.categories
-                    .filter(item => !categoriesByStage.some(el => el.toString() === item.toString()))
-                    .concat([categoryId])
+                    .filter(({category}) => !categoriesByStage.some(el => el.toString() === category.toString()))
+                    .concat({category: categoryId, myModel: false})
+        }))
+    }
+
+    const myModelHandler = event => {
+        const categoryId = event.target.getAttribute('data-category-id')
+        const categoriesByStage = competition.stages.find(({categories}) => categories.some(item => item.toString() === categoryId.toString())).categories
+        setNote(state => ({
+            ...state,
+            categories: state.categories.some(item => item.toString() === categoryId.toString()) ?
+                state.categories.filter(item => item.toString() !== categoryId.toString()) :
+                state.categories
+                    .filter(({category}) => !categoriesByStage.some(el => el.toString() === category.toString()))
+                    .concat({category: categoryId, myModel: event.target.checked})
         }))
     }
 
@@ -163,15 +179,24 @@ export const CompetitionAddParts = () => {
                                 {
                                     stage.categories.map(item => {
                                         return (
-                                            <li className="list-group-item" key={`categs_list_${item}`}>
+                                            <li className="list-group-item d-flex" key={`categs_list_${item}`}>
                                                 <input className="form-check-input me-1" type="checkbox"
-                                                    checked={note.categories.some(el => el.toString() === item.toString())}
+                                                    checked={note.categories.some(({category}) => category.toString() === item.toString())}
                                                     data-category-id={item}
                                                     onChange={categoryHandler}
                                                 />
                                                 {
                                                     categories.find(({_id}) => _id.toString() === item.toString())?.name
                                                 }
+                                                <div className="ms-auto me-2 d-flex align-items-center">
+                                                    <span className="me-2 text-primary">своя модель</span>
+                                                    <input className="form-check-input" type="checkbox"
+                                                        disabled={!note.categories.some(({category}) => category.toString() === item.toString())}
+                                                        checked={note.categories.find(({category}) => category.toString() === item.toString())?.myModel ?? false}
+                                                        data-category-id={item}
+                                                        onChange={myModelHandler}
+                                                    />
+                                                </div>
                                             </li>
                                         )
                                     })
