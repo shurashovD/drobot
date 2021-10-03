@@ -23,6 +23,7 @@ export const PhotoPage = () => {
 
     const fileInputHandler = event => {
         if ( event.target.files?.[0] ) {
+            console.log(note);
             const addFiles = Array.from(event.target.files).slice(0, (10 - files.current.length ?? 0)).map(file => ({file, src: URL.createObjectURL(file)}))
             files.current = files.current.concat(addFiles)
             setNote(state => ({ ...state, photos: state.photos.concat(addFiles.map(({src}) => src)) }))
@@ -71,8 +72,8 @@ export const PhotoPage = () => {
             { step === 'rfid' && <Rfid rfidCallback={rfidCallback} /> }
             { step === 'photo' && <Navbar title="Фотограф" /> }
             { step === 'photo' && <div className="container mb-3">
-                { note?.photos.length === 0 && <h4 className="text-center mt-4">Нет фото</h4> }
-                { note?.photos.length > 0 && <div className="row p-2 bg-light mt-3">
+                { note?.photos?.length === 0 && <h4 className="text-center mt-4">Нет фото</h4> }
+                { note?.photos?.length > 0 && <div className="row p-2 bg-light mt-3">
                     {
                         note?.photos.map(src => (
                             <div className="col-auto d-flex flex-column align-items-center p-1 position-relative" key={src}>

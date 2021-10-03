@@ -21,6 +21,8 @@ export const HygienicalPage = () => {
             const data = JSON.stringify({ note, userId: id })
             const { message } = await sendFormData('/api/notes/set-hygienical-score', { data }, [{ comment: comment.current }])
             successAlert(message)
+            setForm({ number: '', category: '' })
+            setNote(null)
         }
         catch (e) {
             console.log(e)

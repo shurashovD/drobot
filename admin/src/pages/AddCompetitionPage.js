@@ -139,8 +139,6 @@ export const AddCompetitionPage = () => {
     const userInputChange = event => {
         const { value } = event.target
         const filterUsers = users.current
-            .filter(({_id}) => !competition.categories.some(({referees}) => referees.some(referee => referee._id.toString() === _id.toString())))
-            .filter(({_id}) => !competition.screens.some(({screen}) => screen._id.toString() === _id.toString()))
             .filter(({name}) => name.toLowerCase().includes(value.toLowerCase()))
         setUserDropdown(filterUsers)
         setUserInput(value)
@@ -469,11 +467,11 @@ export const AddCompetitionPage = () => {
                                                         onChange={userInputChange}
                                                     />
                                                     {
-                                                        <div className="dropdown position-absolute rounded-0 rounded-bottom">
+                                                        <div className="dropdown position-absolute rounded-0 rounded-bottom" style={{zIndex: 1080}}>
                                                             {
                                                                 userDropdown.map(user => (
                                                                         <button type="button" className="list-group-item list-group-item-action w-100"
-                                                                            key={`d_${_id}`}
+                                                                            key={`d_${_id}_${user._id}`}
                                                                             data-user-id={user._id}
                                                                             data-category-id={_id}
                                                                             onClick={userDropdownHandler}
@@ -502,8 +500,8 @@ export const AddCompetitionPage = () => {
                         />
                         {
                             categDropdown.length > 0 && (
-                                <div className="position-relative">
-                                    <div className="list-group position-absolute w-100 rounded-0 rounded-bottom">
+                                <div className="position-relative"  style={{zIndex: 1080}}>
+                                    <div className="list-group position-absolute w-100 rounded-0 rounded-bottom" style={{zIndex: 1080}}>
                                     {
                                         categDropdown.map(({_id, name}) => (
                                             <button type="button" className="list-group-item list-group-item-action"

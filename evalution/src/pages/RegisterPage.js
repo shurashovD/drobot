@@ -13,6 +13,7 @@ export const RegisterPage = () => {
     const [dropdown, setDropdown] = useState([])
     const [step, setStep] = useState('text')
     const [random, setRandom] = useState(true)
+    const [options, setOptions] = useState([])
     const masterId = useRef()
     const notesRef = useRef()
     const { request, loading, error, clearError } = useHttp()
@@ -20,7 +21,7 @@ export const RegisterPage = () => {
 
     const getNotes = useCallback(async () => {
         try {
-            const response = await request('/api/notes/get-all-in-current-competition')
+            const response = await request('/api/notes/get-avail-to-register')
             notesRef.current = response
             const result = response.reduce((arr, item) => {
                 const index = arr.findIndex(el => el.master._id.toString() === item.master._id.toString())
@@ -40,14 +41,14 @@ export const RegisterPage = () => {
         try {
             const response = await request('/api/categories/get-by-current-cometition')
             setCategories(response)
+            setOptions(response)
         }
         catch {}
     }, [request])
 
     const selectHandler = event => {
-        setForm(state => ({...state, category: event.target.value, name: ''}))
+        setForm(state => ({...state, category: event.target.value}))
         setDropdown([])
-        masterId.current = null
     }
 
     const nameChangeHandler = event => {
@@ -58,10 +59,7 @@ export const RegisterPage = () => {
         }
         else {
             setDropdown(
-                notes.filter(({master}) => master.name.toLowerCase().includes(event.target.value.toLowerCase()))
-                    .filter(({rfid}) => !(rfid?.length === 10))
-                    .filter(({categories}) => categories.some(item => item._id.toString() === form.category.toString()))
-                    .slice(0, 10)
+                notes.filter(({master}) => master.name.toLowerCase().includes(event.target.value.toLowerCase())).slice(0, 10)
             )
         }
     }
@@ -71,6 +69,10 @@ export const RegisterPage = () => {
         masterId.current = userId
         const { name, mail } = notes.find(({master}) => master._id.toString() === userId.toString()).master
         setForm(state => ({...state, name, mail}))
+        setOptions(
+            notesRef.current.filter(({master}) => master._id.toString() === masterId.current.toString())
+                .map(({category}) => categories.find(({_id}) => _id.toString() === category._id.toString()))
+        )
         setDropdown([])
     }
 
@@ -95,6 +97,10 @@ export const RegisterPage = () => {
     const btnCallback = () => {
         setStep('text')
     }
+
+    useEffect(() => {
+        console.log(options)
+    }, [options])
 
     useEffect(() => {
         if ( random ) {
@@ -124,24 +130,9 @@ export const RegisterPage = () => {
                 <div className="row mt-5 gx-5 justify-content-center">
                     <div className="col-4">
                         <div className="row">
-                            <p className="text-center mb-2">Выбор категории</p>
-                        </div>
-                        <div className="row">
-                            <select className="form-select fs-4" value={form.category}
-                                onChange={selectHandler}
-                            >
-                                <option value={''} className="fs-5">--Не выбрано--</option>
-                                {
-                                    categories.map(({_id, name}) => <option value={_id} key={_id} className="fs-5">{name}</option>)
-                                }
-                            </select>
-                        </div>
-                    </div>
-                    <div className="col-4">
-                        <div className="row">
                             <p className="text-center mb-2">Фамилия, имя участника</p>
                             <input className="form-control fs-4" value={form.name}
-                                disabled={(form.category === '') || random}
+                                disabled={random}
                                 onChange={nameChangeHandler}
                             />
                             { dropdown.length > 0 && <div className="w-100 d-block position-relative p-0">
@@ -158,6 +149,22 @@ export const RegisterPage = () => {
                                     }
                                 </div>
                             </div> }
+                        </div>
+                    </div>
+                    <div className="col-4">
+                        <div className="row">
+                            <p className="text-center mb-2">Выбор категории</p>
+                        </div>
+                        <div className="row">
+                            <select className="form-select fs-4" value={form.category}
+                                disabled={ !random && !masterId.current }
+                                onChange={selectHandler}
+                            >
+                                <option value={''} className="fs-5">--Не выбрано--</option>
+                                {
+                                    options.map(({_id, name}) => <option value={_id} key={_id} className="fs-5">{name}</option>)
+                                }
+                            </select>
                         </div>
                     </div>
                 </div>

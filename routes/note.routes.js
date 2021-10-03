@@ -60,6 +60,31 @@ router.get('/get-all-in-current-competition', parser.json(), async (req, res) =>
     }
 })
 
+router.get('/get-avail-to-register', parser.json(), async (req, res) => {
+    try {
+        const competition = await CompetitionModel.findOne({ status: COMP_ST.started })
+        const categories = await CategoryModel.find()
+        const masters = await MasterModel.find()
+        const notes = await NoteModel.find({
+            competitionId: competition._id,
+            rfid: { $exists: false },
+            myModel: { $eq: true }
+        })
+
+        const result = notes.map(note => {
+            const category = categories.find(({_id}) => _id.toString() === note.category.toString())
+            const master = masters.find(({_id}) => _id.toString() === note.master.toString())
+            return { ...note.toObject(), category, master }
+        })
+
+        res.json(result)
+    }
+    catch (e) {
+        console.log(e)
+        return res.status(500).json({ message: 'Что-то пошло не так...' })
+    }
+})
+
 router.post('/get-all', parser.json(), async (req, res) => {
     try {
         const { competitionId } = req.body
@@ -318,16 +343,15 @@ router.post('/get-note-by-rfid', parser.json(), async (req, res) => {
         const { rfid } = req.body
         const categories = await CategoryModel.find()
         const masters = await MasterModel.find()
-        const notes = await NoteModel.find({ rfid })
-
-        const result = notes.map(note => {
-            const category = categories.find(({_id}) => _id.toString() === note.category.toString())
-            const master = masters.find(({_id}) => _id.toString() === note.master.toString())
-            return { ...note.toObject(), category, master }
-        })
-
-        res.json(result)
-        return res.status(500).json({ message: 'Участник не найден...' })
+        const note = await NoteModel.findOne({ rfid })
+        if ( !note ) {
+            return res.status(500).json({ message: 'Пусатя метка' })
+        }
+        const category = categories.find(({_id}) => _id.toString() === note.category.toString())
+        const master = masters.find(({_id}) => _id.toString() === note.master.toString())
+        note.category = category
+        note.master = master
+        return res.json(note)
     }
     catch (e) {
         console.log(e)

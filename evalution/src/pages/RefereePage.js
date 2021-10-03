@@ -81,7 +81,7 @@ export const RefereePage = () => {
             if ( parseInt(value) > 50 ) {
                 value = 50
             }
-            if ( value.length > 1 ) {
+            if ( value[0] === '0' ) {
                 value = parseInt(value.slice(1))
             }
         }
@@ -106,6 +106,10 @@ export const RefereePage = () => {
     const photoBtnCallback = () => setPhotoShow(true)
 
     useEffect(() => {
+        console.log(photoShow)
+    }, [photoShow])
+
+    useEffect(() => {
         console.log(note?.scores);
     }, [note])
 
@@ -117,7 +121,7 @@ export const RefereePage = () => {
             clearFile()
             micBusy.current = null
         }
-    }, [file, clearFile, comments, note._id, id])
+    }, [file, clearFile, comments, note, id])
     
     useEffect(() => {
         if ( error ) {
@@ -127,13 +131,13 @@ export const RefereePage = () => {
     }, [error, errorAlert, clearError])
 
     return (
-        <div className="container-fluid min-vh-100 d-flex flex-column">
+        <div className="container-fluid min-vh-100 d-flex flex-column p-0 m-0">
             { loading && <Loader /> }
             <Navbar title={`Судья: ${name}`} label={note?.category.name} btnTitle={note?.photos.length > 0 && "Фото модели"} btnCallback={photoBtnCallback} />
             { !note && <Rfid rfidCallback={rfidCallback} /> }
             { note &&
                 <div className="container">
-                    <div className="mt-4">
+                    <div className="mt-4 row">
                         <table className="table text-primary table-bordered border-primary">
                             <thead className="text-center">
                                 <tr>
@@ -197,18 +201,20 @@ export const RefereePage = () => {
                 </div>
             }
             { note &&
-                <div className="row justify-content-around mt-auto mb-3">
+                <div className="row justify-content-around mx-0 mt-auto mb-3">
                     <button className="btn btn-primary col-auto" onClick={submitHandler}>OK</button>
                     <button className="btn btn-primary col-auto" onClick={cancelHandler}>Отмена</button>
                 </div>    
             }
-            { photoShow && <div className="position-absolute top-0 left-0 container-fluid p-1 m-0">
-                <div className="row p-2 justify-content-end">
-                    <btn className="btn-close" onClick={() => setPhotoShow(false)} />
+            { photoShow && <div className="position-absolute top-0 left-0 container-fluid p-1 m-0 bg-secondary min-vh-100">
+                <div className="row m-0">
+                    <div className="row justify-content-end p-2">
+                        <btn className="btn-close" onClick={() => setPhotoShow(false)} />
+                    </div>
                     {
                         note.photos?.map(src => (
-                            <div className="row justify-content-center">
-                                <img className="img-fluid" src={src} alt="Участник" />
+                            <div className="row justify-content-center" key={src}>
+                                <img className="img-fluid m-0 p-0" src={src} alt="Участник" />
                             </div>
                         ))
                     }

@@ -13,7 +13,7 @@ export const Navbar = props => {
                 <h4 className="mb-0 mx-auto">{props.label}</h4>
             </div>
             <div className="col-2">
-                { props.btnTitle && <button className="btn btn-primary">{props.btnTitle}</button> }
+                { props.btnTitle && <button className="btn btn-primary" onClick={props.btnCallback}>{props.btnTitle}</button> }
             </div>
             <div className="col-1">
                 <span className="ms-auto me-2 nav-item" onClick={logout}>
