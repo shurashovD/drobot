@@ -39,12 +39,12 @@ export const CompetitionPartsDistributuion = () => {
                 const stage = competition.stages.find(({categories}) => categories.some(item => item.toString() === note.category._id.toString())).number
                 const item = arr.find(({number}) => number === note.number)
                 if ( item ) {
-                    item.stages.push(stage)
+                    item.stages.push({ stageNumber: stage, name: note.master.name })
                     return arr
                 }
                 arr.push({
-                    number: note.number, name: note.master.name,
-                    stages: [stage]
+                    number: note.number,
+                    stages: [{ stageNumber: stage, name: note.master.name }]
                 })
                 return arr
             }, [])
@@ -86,13 +86,14 @@ export const CompetitionPartsDistributuion = () => {
                         </thead>
                         <tbody>
                             {
-                                parts.map(({number, name, stages}) => (
+                                parts.map(({number, stages}) => (
                                     <tr key={number}>
                                         <td>{number}</td>
                                         {
                                             competition.stages.map(stage => {
-                                                return stages.some(item => item === stage.number) ?
-                                                    <td key={`${number}_${stage.number}`}>{name}</td> :
+                                                const item = stages.find(({stageNumber}) => stageNumber === stage.number)
+                                                return item ?
+                                                    <td key={`${number}_${stage.number}`}>{item.name}</td> :
                                                     <td key={`${number}_${stage.number}`}>Пусто</td>
                                             })
                                         }
