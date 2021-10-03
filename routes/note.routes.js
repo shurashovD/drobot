@@ -739,7 +739,8 @@ router.post('/set-referee-scores', commentUploadHandler, async (req, res) => {
         if (
             competition.categories
             .find(({category}) => category.toString() === note.category.toString())
-            ?.referees.length === note.scores.length
+            ?.referees.filter(({role}) => role === ROLE.referee)
+            ?.length === note.scores.length
         ) {
             note.completed = true
             note.refereeTotal = note.scores
