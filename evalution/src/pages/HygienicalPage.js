@@ -86,7 +86,7 @@ export const HygienicalPage = () => {
         comment.current = null
         if ( form.category !== '' && event.target.value !== '' ) {
             try {
-                const response = await request('/api/notes/get-note-by-number', 'POST', {...form, number: event.target.value})
+                const response = await request('/api/notes/get-note-for-hygienical', 'POST', {...form, number: event.target.value})
                 if ( !response.none ) {
                     setNote(response)
                 }

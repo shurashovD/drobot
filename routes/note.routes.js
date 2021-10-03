@@ -68,7 +68,8 @@ router.get('/get-avail-to-register', parser.json(), async (req, res) => {
         const notes = await NoteModel.find({
             competitionId: competition._id,
             rfid: { $exists: false },
-            myModel: { $eq: true }
+            myModel: { $eq: true },
+            completed: { $ne: true }
         })
 
         const result = notes.map(note => {
@@ -369,6 +370,32 @@ router.post('/get-note-by-number', parser.json(), async (req, res) => {
         }
         
         const note = await NoteModel.findOne({ category: mongoose.Types.ObjectId(category), number })
+        if ( !note ) {
+            return res.json({ none: true })
+        }
+        const categories = await CategoryModel.find()
+        const masters = await MasterModel.find()
+        const result = note.toObject()
+        result.category = categories.find(({_id}) => _id.toString() === note.category.toString())
+        result.master = masters.find(({_id}) => _id.toString() === note.master.toString())
+        return res.json(result)
+    }
+    catch (e) {
+        console.log(e);
+        return res.status(500).json({ message: 'Что-то пошло не так...' })
+    }
+})
+
+router.post('/get-note-for-hygienical', parser.json(), async (req, res) => {
+    try {
+        const { number, category } = req.body
+
+        const competition = await CompetitionModel.findOne({ status: COMP_ST.started })
+        if ( !competition ) {
+            return res.status(500).json({ message: 'Нет запущенного мероприятия' })
+        }
+        
+        const note = await NoteModel.findOne({ category: mongoose.Types.ObjectId(category), number, rfid: {$exists: true}, completed: false })
         if ( !note ) {
             return res.json({ none: true })
         }
@@ -719,7 +746,7 @@ router.post('/set-referee-scores', commentUploadHandler, async (req, res) => {
                 .reduce((arr, {refereeScores}) => arr.concat(refereeScores), [])
                 .reduce((sum, {value}) => sum + value, 0)
             note.total = note.refereeTotal + note.previousScore.value + note.hygienicalScore.value
-            note.middle = Math.round(1000 * note.total / (note.scores.length + 2) / category.tasks.length) / 1000
+            note.middle = Math.round(1000 * note.total / (note.scores.length + 1.2) / category.tasks.length) / 1000
         }
         note.lastReferee = userId
         await note.save()
