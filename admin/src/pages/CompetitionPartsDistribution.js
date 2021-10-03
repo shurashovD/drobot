@@ -37,7 +37,7 @@ export const CompetitionPartsDistributuion = () => {
         if ( notes, competition ) {
             const result = notes.reduce((arr, note) => {
                 const stage = competition.stages.find(({categories}) => categories.some(item => item.toString() === note.category._id.toString())).number
-                if ( arr.some(({_id}) => _id.toString() === note.master._id.toString()) ) {
+                if ( arr.some(({number}) => number === note.number) ) {
                     arr.find(({_id}) => _id.toString() === note.master._id.toString()).stages.push(stage)
                     return arr
                 }
