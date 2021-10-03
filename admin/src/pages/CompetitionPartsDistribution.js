@@ -37,12 +37,13 @@ export const CompetitionPartsDistributuion = () => {
         if ( notes, competition ) {
             const result = notes.reduce((arr, note) => {
                 const stage = competition.stages.find(({categories}) => categories.some(item => item.toString() === note.category._id.toString())).number
-                if ( arr.some(({number}) => number === note.number) ) {
-                    arr.find(({_id}) => _id.toString() === note.master._id.toString()).stages.push(stage)
+                const item = arr.find(({number}) => number === note.number)
+                if ( item ) {
+                    item.stages.push(stage)
                     return arr
                 }
                 arr.push({
-                    _id: note.master._id, number: note.number, name: note.master.name,
+                    number: note.number, name: note.master.name,
                     stages: [stage]
                 })
                 return arr
@@ -85,14 +86,14 @@ export const CompetitionPartsDistributuion = () => {
                         </thead>
                         <tbody>
                             {
-                                parts.map(({_id, number, name, stages}) => (
-                                    <tr key={_id}>
+                                parts.map(({number, name, stages}) => (
+                                    <tr key={number}>
                                         <td>{number}</td>
                                         {
-                                            competition.stages.map(({number}) => {
-                                                return stages.some(item => item === number) ?
-                                                    <td key={`${_id}_${number}`}>{name}</td> :
-                                                    <td key={`${_id}_${number}`}>Пусто</td>
+                                            competition.stages.map(stage => {
+                                                return stages.some(item => item === stage.number) ?
+                                                    <td key={`${number}_${stage.number}`}>{name}</td> :
+                                                    <td key={`${number}_${stage.number}`}>Пусто</td>
                                             })
                                         }
                                     </tr>
