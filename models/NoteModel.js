@@ -44,3 +44,75 @@ const noteSchema = new Schema(
 )
 
 module.exports = model('Note', noteSchema)
+
+/*{
+        "refereeScores": [{
+            "value": 44
+        }, {
+            "value": 45
+        }, {
+            "value": 48
+        }, {
+            "value": 45
+        }, {
+            "value": 44
+        }, {
+            "value": 47
+        }]
+    }, {
+        "refereeScores": [{
+            "value": 43
+        }, {
+            "value": 41
+        }, {
+            "value": 46
+        }, {
+            "value": 45
+        }, {
+            "value": 42
+        }, {
+            "value": 45
+        }]
+    }, {
+        "refereeScores": [{
+            "value": 47
+        }, {
+            "value": 44
+        }, {
+            "value": 50
+        }, {
+            "value": 45
+        }, {
+            "value": 45
+        }, {
+            "value": 50
+        }]
+    }, {
+        "refereeScores": [{
+            "value": 46
+        }, {
+            "value": 45
+        }, {
+            "value": 50
+        }, {
+            "value": 45
+        }, {
+            "value": 44
+        }, {
+            "value": 48
+        }]
+    }, {
+        "refereeScores": [{
+            "value": 47
+        }, {
+            "value": 44
+        }, {
+            "value": 49
+        }, {
+            "value": 45
+        }, {
+            "value": 43
+        }, {
+            "value": 48
+        }]
+    }*/

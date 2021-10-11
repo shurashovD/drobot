@@ -22,9 +22,7 @@ export const useAuth = () => {
                 login({_id, name, role})
             }
         }
-        catch (e) {
-            console.log(e)
-        }
+        catch {}
     }, [login])
 
     return { login, logout }

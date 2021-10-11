@@ -19,7 +19,7 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "react-scripts build",
+    "build": "cross-env BUILD_PATH='../static/evalution' react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },

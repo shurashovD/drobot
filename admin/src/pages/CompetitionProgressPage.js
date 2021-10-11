@@ -4,6 +4,7 @@ import { Loader } from "../components/Loader"
 import { Navbar } from "../components/Navbar"
 import { useAlert } from "../hooks/alert.hook"
 import { useHttp } from "../hooks/http.hook"
+/*
 
 export const CompetitionProgressPage = () => {
     const [filterNotes, setFilterNotes] = useState([])
@@ -94,4 +95,6 @@ export const CompetitionProgressPage = () => {
             </div>
         </div>
     )
-}
+}*/
+
+export const CompetitionProgressPage = () => <h1>CompetitionProgressPage</h1>

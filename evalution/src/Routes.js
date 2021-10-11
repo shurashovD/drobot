@@ -93,10 +93,10 @@ export const Routes = () => {
 
     return (
         <Switch>
-            <Route path="/evalution/login">
+            <Route path="/login">
                 <AuthPage />
             </Route>
-            <Redirect to="/evalution/login" />
+            <Redirect to="/login" />
         </Switch>
     )
 }

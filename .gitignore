@@ -6,8 +6,13 @@ uploads
 
 pass.txt
 
-static
+static/avatars
+static/uploads
+static/admin
+static/evalution
 
 tmp
 
 sslcert
+
+computed.js

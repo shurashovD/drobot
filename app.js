@@ -5,6 +5,10 @@ const config = require('config')
 const fs = require('fs')
 const path = require('path')
 const dictionaryModel = require('./models/DictionaryModel')
+const hbs = require('express-handlebars').create({
+    defaultLayout: 'main',
+    extname: 'hbs'
+})
 
 const app = express()
 
@@ -17,7 +21,7 @@ const start = async () => {
         })
         global.dictionary = await dictionaryModel.find()
         app.listen(PORT, () => {
-            if ( process.env.NODE_ENV === 'production' ) {
+            /*if ( process.env.NODE_ENV === 'production' ) {
                 const options = {
                     cert: fs.readFileSync(path.join(__dirname, 'sslcert', 'fullchain.pem')),
                     key: fs.readFileSync(path.join(__dirname, 'sslcert', 'privkey.pem'))
@@ -28,13 +32,20 @@ const start = async () => {
             }
             else {
                 console.log(`Server is running on PORT ${PORT}...`)
-            }
+            }*/
+            console.log(`Server is running on PORT ${PORT}...`)
         })
     }
     catch (e) {
         console.log(e);
     }
 }
+
+app.engine('hbs', hbs.engine)
+app.set('view engine', 'hbs')
+app.set('views', 'views')
+
+app.use('/', require('./routes/result.routes'))
 
 app.use('/api/auth', require('./routes/auth.routes'))
 
@@ -48,14 +59,8 @@ app.use('/api/masters', require('./routes/master.routes'))
 
 app.use('/api/notes', require('./routes/note.routes'))
 
+app.use(express.static(path.join(__dirname, 'static')))
+
 //app.use('/results', require('./routes/result.routes'))
-
-app.use('/.well-known', express.static(path.join(__dirname, 'static', '.well-known')))
-
-app.use('/admin', express.static(path.join(__dirname, 'admin', 'build')))
-
-app.use('/evalution', express.static(path.join(__dirname, 'evalution', 'build')))
-
-app.use('/static', express.static(path.join(__dirname, 'static')))
 
 start()

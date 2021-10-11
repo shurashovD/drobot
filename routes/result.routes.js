@@ -4,94 +4,100 @@ const NoteModel = require('../models/NoteModel')
 const MasterModel = require('../models/MasterModel')
 const UserModel = require('../models/UserModel')
 
-router.get('/', async (req, res) => {
-    const Notes = await NoteModel.find({competitionId: '6148ce9a4b4198bbc0028eb8', completed: true})
-    const Masters = await MasterModel.find()
-    const Users = await UserModel.find()
-
-    const categories = [
-        { categoryName: 'feathering' },
-        { categoryName: 'arrow' },
-        { categoryName: 'lips' },
-        { categoryName: 'hairTechnology' },
-        { categoryName: 'Microblading' }
-    ]
-
-    const parts = categories.map(({categoryName}) => {
-        const result = Notes.filter(({category}) => category === categoryName)
-            .map(note => {
-                const name = Masters.find(({_id}) => _id.toString() === note.master.toString())?.name ?? 'Master'
-
-                const scores = note.scores.map(score => {
-                    const referee = Users.find(({_id}) => _id.toString() === score.refereeId.toString())?.name ?? 'Referee'
-                    const value = score.refereeScores.reduce((sum, item) => sum + item.value, 0)
-                    return { referee, value }
+router.use('/', async (req, res) => {
+    try {
+        const categories = [
+            { id: '6155f8b6217dc7c1d9cf9079', name: 'Волоски аппаратные' },   
+            { id: '6155f9a8217dc7c1d9cf90aa', name: 'Перекрытие бровей' },
+            { id: '6155f354217dc7c1d9cf8f8a', name: 'Брови: Юниор' },
+            { id: '6155f50f98e45cfa72ec9714', name: 'Брови: Профи' },
+            { id: '6155f52998e45cfa72ec9715', name: 'Брови: Профи ПЛЮС' },
+            { id: '6155fe25217dc7c1d9cf90df', name: 'Губы: Юниор' },
+            { id: '6155fe6f97366a2ec9495d04', name: 'Губы: Профи' },
+            { id: '6155fe7897366a2ec9495d05', name: 'Губы: Профи ПЛЮС' },
+            { id: '6155f687217dc7c1d9cf9055', name: 'Стрелка с растушёвкой' },    
+            { id: '615600c8217dc7c1d9cf9194', name: 'Эксперт' }
+        ]
+        const gp = [
+            {
+                name: 'Юниор',
+                categories: [
+                    '6155f354217dc7c1d9cf8f8a',
+                    '6155fe25217dc7c1d9cf90df'
+                ] 
+            },
+            {
+                name: 'Профи',
+                categories: [
+                    '6155f50f98e45cfa72ec9714',
+                    '6155fe6f97366a2ec9495d04'
+                ] 
+            },
+            {
+                name: 'Профи ПЛЮС',
+                categories: [
+                    '6155f52998e45cfa72ec9715',
+                    '6155fe7897366a2ec9495d05'
+                ] 
+            },
+            {
+                name: 'Эксперт',
+                categories: [
+                    '615600c8217dc7c1d9cf9194'
+                ] 
+            }
+        ]
+        const notes = await NoteModel.find({ completed: true })
+        const masters = await MasterModel.find()
+        const users = await UserModel.find()
+        const main = categories.map(category => {
+            const pedestal = notes.filter(note => note.category.toString() === category.id.toString())
+                .map(note => {
+                    const refereesScores = note.scores.reduce((arr, {refereeScores}) => arr.concat(refereeScores.map(({value}) => value)), [50, 0])
+                    const value = refereesScores.reduce((sum, item) => sum + item, 0) / refereesScores.length
+                    const { name } = masters.find(({_id}) => _id.toString() === note.master.toString())
+                    const referees = note.scores.map(({referee, refereeScores}, index) => {
+                        const name = users.find(({_id}) => _id.toString() === referee?.toString())?.name || `Судья ${index+1}`
+                        const total = refereeScores.reduce((sum, item) => sum + item.value, 0)
+                        return { name, total }
+                    })
+                    return { id: note._id, name, value, referees }
                 })
-
-                const total = scores.reduce((sum, item) => sum + item.value, 0)
-
-                return { id: note._id, name, scores, total }
-            })
-            .sort((a, b) => b.total - a.total)
-        return { categoryName, result }
-    })
-
-    let body = `
-        <!DOCTYPE html>
-            <html lang="en">
-            <head>
-                <meta charset="UTF-8">
-                <meta http-equiv="X-UA-Compatible" content="IE=edge">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet"
-                    integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
-                <title>WULOP KZ result</title>
-            </head>
-            <body>
-                <div class="container">
-    `
-
-    parts.forEach(({categoryName, result}) => {
-        const title = global.dictionary.find(({lang, key}) => (lang === 'RU' && key === categoryName)).phrase
-        body += `<h3 class="text-center pt-3">${title}</h3>`
-        body += `<div class="accordion" id="c_${categoryName}">`
-        result.forEach(({id, name, scores, total}, index) => {
-            body += `
-                <div class="accordion-item">
-                    <h2 class="accordion-header" id="h_${id}">
-                        <button class="accordion-button collapsed w-100" type="button" data-bs-toggle="collapse"
-                            data-bs-target="#n_${id}" aria-expanded="false" aria-controls="flush-collapseOne">
-                                <span class="col-1 text-center">${index + 1}</span>
-                                <span class="col-8 col-sm-4">${name}</span>
-                                <span class="col-2 text-center">${total}</span>
-                        </button>
-                    </h2>
-                    <div id="n_${id}" class="accordion-collapse collapse" aria-labelledby="flush-headingOne"
-                        data-bs-parent="#c_${categoryName}">
-                        <div class="accordion-body">
-                            <div class="row justify-content-around">
-            `
-            scores.forEach(({referee, value}) => {
-                body += `<div class="col-12 col-sm-auto border rounded bg-light p-2 d-flex justify-content-between">
-                    <span>${referee}</span>
-                    <span class="ms-2">${value}</span>
-                </div>`
-            })
-            body += `</div></div></div></div>
-            `
+                .sort((a, b) => b.value - a.value)
+                /*.slice(0, 5)*/
+                .map((item, index) => ({ ...item, value: Math.round(1000 * item.value) / 1000, place: index + 1 }))
+            return { category: category.name, pedestal }
         })
-        body += `</div>`
-    })
-
-    body += `
-        </div>
-            <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js"
-                integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM"
-                crossorigin="anonymous"></script>
-        </body>
-        </html>
-    `
-    res.send(body)
+        const grandPree = gp.map(gpItem => {
+                //отобраные те, кто есть в основных
+            const { name, value } = notes.filter(({category}) => gpItem.categories.some(item => item.toString() === category.toString()))
+                // отобраны те, у кого есть еще одна категория кроме эксперта;
+                .filter(note => {
+                    return notes
+                        .filter(({category}) => category.toString() !== '615600c8217dc7c1d9cf9194')
+                        .some(item => (item._id.toString() !== note._id.toString()) && item.master.toString() === note.master.toString())
+                })
+                .map(note => {
+                    const {name} = masters.find(({_id}) => _id.toString() === note.master.toString())
+                    const values = notes.filter(({_id, master}) => (master.toString() === note.master.toString()) && (_id.toString() !== note._id.toString()))
+                        .filter(({category}) => (gpItem.name === 'Эксперт') || (category.toString() !== '615600c8217dc7c1d9cf9194'))
+                        .map(note => {
+                            const refereesScores = note.scores.reduce((arr, {refereeScores}) => arr.concat(refereeScores.map(({value}) => value)), [50, 0])
+                            return refereesScores.reduce((sum, item) => sum + item, 0) / refereesScores.length
+                        })
+                    const refereesScores = note.scores.reduce((arr, {refereeScores}) => arr.concat(refereeScores.map(({value}) => value)), [50, 0])
+                    const value = refereesScores.reduce((sum, item) => sum + item, 0) / refereesScores.length + Math.max(...values)
+                    return { name, value }
+                })
+                .sort((a, b) => b.value - a.value)[0]
+            return { grandPreeName: gpItem.name, winnerName: name, winnerScore: Math.round(1000 * value) / 1000 }
+        })
+        res.render('index', {main, grandPree})
+    }
+    catch (e) {
+        console.log(e);
+        res.render('index', {error: 'Ошибка'})
+    }
 })
 
 module.exports = router
