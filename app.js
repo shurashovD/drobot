@@ -45,8 +45,6 @@ app.engine('hbs', hbs.engine)
 app.set('view engine', 'hbs')
 app.set('views', 'views')
 
-app.use('/', require('./routes/result.routes'))
-
 app.use('/api/auth', require('./routes/auth.routes'))
 
 app.use('/api/categories', require('./routes/category.routes'))
@@ -60,6 +58,8 @@ app.use('/api/masters', require('./routes/master.routes'))
 app.use('/api/notes', require('./routes/note.routes'))
 
 app.use(express.static(path.join(__dirname, 'static')))
+
+app.use('/', require('./routes/result.routes'))
 
 //app.use('/results', require('./routes/result.routes'))
 

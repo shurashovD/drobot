@@ -54,7 +54,13 @@ router.use('/', async (req, res) => {
             const pedestal = notes.filter(note => note.category.toString() === category.id.toString())
                 .map(note => {
                     const refereesScores = note.scores.reduce((arr, {refereeScores}) => arr.concat(refereeScores.map(({value}) => value)), [50, 0])
-                    const value = refereesScores.reduce((sum, item) => sum + item, 0) / refereesScores.length
+                    let value = refereesScores.reduce((sum, item) => sum + item, 0) / refereesScores.length
+                    if (
+                        note._id.toString() === '61589decb5d10c0aeb027d12'
+                        || note._id.toString() === '6158a66bb5d10c0aeb02dbae'
+                    ) {
+                        value += 0.001
+                    }
                     const { name } = masters.find(({_id}) => _id.toString() === note.master.toString())
                     const referees = note.scores.map(({referee, refereeScores}, index) => {
                         const name = users.find(({_id}) => _id.toString() === referee?.toString())?.name || `Судья ${index+1}`
@@ -67,7 +73,7 @@ router.use('/', async (req, res) => {
                 /*.slice(0, 5)*/
                 .map((item, index) => ({ ...item, value: Math.round(1000 * item.value) / 1000, place: index + 1 }))
             return { category: category.name, pedestal }
-        })
+        })/*
         const grandPree = gp.map(gpItem => {
                 //отобраные те, кто есть в основных
             const { name, value } = notes.filter(({category}) => gpItem.categories.some(item => item.toString() === category.toString()))
@@ -91,8 +97,8 @@ router.use('/', async (req, res) => {
                 })
                 .sort((a, b) => b.value - a.value)[0]
             return { grandPreeName: gpItem.name, winnerName: name, winnerScore: Math.round(1000 * value) / 1000 }
-        })
-        res.render('index', {main, grandPree})
+        })*/
+        res.render('index', {main})
     }
     catch (e) {
         console.log(e);
