@@ -21,7 +21,7 @@ const start = async () => {
         })
         global.dictionary = await dictionaryModel.find()
         app.listen(PORT, () => {
-            /*if ( process.env.NODE_ENV === 'production' ) {
+            if ( process.env.NODE_ENV === 'production' ) {
                 const options = {
                     cert: fs.readFileSync(path.join(__dirname, 'sslcert', 'fullchain.pem')),
                     key: fs.readFileSync(path.join(__dirname, 'sslcert', 'privkey.pem'))
@@ -32,7 +32,7 @@ const start = async () => {
             }
             else {
                 console.log(`Server is running on PORT ${PORT}...`)
-            }*/
+            }
             console.log(`Server is running on PORT ${PORT}...`)
         })
     }

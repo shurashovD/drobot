@@ -22,10 +22,15 @@
                             <div class="accordion-body">
                                 <div class="row justify-content-around">
                                 {{#each this.referees}}
-                                        <div class="col-12 col-sm-auto border rounded bg-light p-2 d-flex justify-content-between">
-                                            <span>{{this.name}}</span>
-                                            <span class="ms-2">{{this.total}}</span>
-                                        </div>
+                                    <ul class="list-group col-12 col-md-2 mb-2">
+                                        <li class="list-group-item fw-bold">{{this.name}}</li>
+                                        {{#each this.scores}}
+                                            <li class="list-group-item d-flex">
+                                                <span class="me-2">{{this.test}}</span>
+                                                <span class="ms-auto">{{this.value}}</span>
+                                            </li>
+                                        {{/each}}
+                                    </ul>
                                 {{/each}}
                                 </div>
                             </div>

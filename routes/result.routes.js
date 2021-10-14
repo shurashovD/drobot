@@ -3,6 +3,7 @@ const router = require('express').Router()
 const NoteModel = require('../models/NoteModel')
 const MasterModel = require('../models/MasterModel')
 const UserModel = require('../models/UserModel')
+const CategoryModel = require('../models/CategoryModel')
 
 router.use('/', async (req, res) => {
     try {
@@ -50,6 +51,8 @@ router.use('/', async (req, res) => {
         const notes = await NoteModel.find({ completed: true })
         const masters = await MasterModel.find()
         const users = await UserModel.find()
+        const categoryNotes = await CategoryModel.find()
+        const tests = categoryNotes.reduce((arr, {tasks}) => arr.concat(tasks), [])
         const main = categories.map(category => {
             const pedestal = notes.filter(note => note.category.toString() === category.id.toString())
                 .map(note => {
@@ -64,8 +67,10 @@ router.use('/', async (req, res) => {
                     const { name } = masters.find(({_id}) => _id.toString() === note.master.toString())
                     const referees = note.scores.map(({referee, refereeScores}, index) => {
                         const name = users.find(({_id}) => _id.toString() === referee?.toString())?.name || `Судья ${index+1}`
-                        const total = refereeScores.reduce((sum, item) => sum + item.value, 0)
-                        return { name, total }
+                        const scores = refereeScores.map(({test, value}) => {
+                            return { test: tests.find(item => item._id.toString() === test?.toString())?.name, value }
+                        })
+                        return { name, scores }
                     })
                     return { id: note._id, name, value, referees }
                 })
