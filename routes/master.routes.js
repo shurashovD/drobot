@@ -6,6 +6,10 @@ const fs = require('fs')
 const parser = require('body-parser')
 
 const MasterModel = require('../models/MasterModel')
+const NoteModel = require('../models/NoteModel')
+const CompetitionModel = require('../models/CompetitionModel')
+const UserModel = require('../models/UserModel')
+const CategoryModel = require('../models/CategoryModel')
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
@@ -162,6 +166,62 @@ router.post('/remove-master', parser.json(), async (req, res) => {
     }
     catch (e) {
         log.error(e)
+        res.status(500).json({ message: 'Что-то пошло не так...' })
+    }
+})
+
+router.post('/login', parser.json(), async (req, res) => {
+    try {
+        const { mail } = req.body
+        if ( !mail || mail === '' ) {
+            return res.status(500).json({ message: 'Пустая почта' })
+        }
+        const master = await MasterModel.findOne({ mail })
+        if ( !master ) {
+            return res.status(500).json({ message: 'Мастер с такой почтой не найден' })
+        }
+        return res.json(master.toObject())
+    }
+    catch (e) {
+        log.error(e)
+        res.status(500).json({ message: 'Что-то пошло не так...' })
+    }
+})
+
+router.post('/get-comments', parser.json(), async (req, res) => {
+    try {
+        const { id } = req.body
+        const notesByMaster = await NoteModel.find({ master: mongoose.Types.ObjectId(id) })
+        const competitionsId = Array.from(new Set(notesByMaster.map(({competitionId}) => competitionId)))
+            .map(item => mongoose.Types.ObjectId(item))
+
+        const competitions = await CompetitionModel.find({ _id: { $in: competitionsId } })
+        const users = await UserModel.find()
+        const categories = await CategoryModel.find()
+        const result = competitions.map(({_id, name}) => {
+            const comments = notesByMaster.filter(({competitionId}) => competitionId.toString() === _id.toString())
+                .map(item => {
+                    const category = categories.find(({_id}) => _id.toString() === item.category.toString())
+                    if ( !category ) {
+                        return null
+                    }
+
+                    const items = item.scores.reduce((arr, {referee, refereeScores}) => {
+                        const refereeName = users.find(({_id}) => _id.toString() === referee.toString() )?.name ?? ''
+                        const elements = refereeScores.map(({_id, test, comment}) => {
+                            const taskName = category.tasks.find(({_id}) => _id.toString() === test.toString())?.name ?? ''
+                            return { _id, refereeName, taskName, link: comment }
+                        }).filter(({link}) => !!link)
+                        return arr.concat(elements)
+                    }, [])
+                    return { _id: item.category, categoryName: category.name, items }
+                })
+            return { _id, competition: name, comments }
+        })
+        return res.json(result)    
+    }
+    catch (e) {
+        console.log(e)
         res.status(500).json({ message: 'Что-то пошло не так...' })
     }
 })

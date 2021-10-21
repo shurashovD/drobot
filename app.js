@@ -12,6 +12,8 @@ const hbs = require('express-handlebars').create({
 
 const app = express()
 
+const mapper = require('./handlers/mapper')
+
 const start = async () => {
     const PORT = config.get('PORT') || 5000
     try {
@@ -33,7 +35,6 @@ const start = async () => {
             else {
                 console.log(`Server is running on PORT ${PORT}...`)
             }
-            console.log(`Server is running on PORT ${PORT}...`)
         })
     }
     catch (e) {
